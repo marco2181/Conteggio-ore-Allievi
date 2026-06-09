@@ -210,3 +210,65 @@ def generate_monthly_report(output_path, rows, year, month):
     ))
 
     doc.build(story)
+
+
+def generate_course_report(output_path, course_name, rows):
+    """
+    rows: lista di dict-like con name, enrollment_date, total_hours, hours_done
+    """
+    doc = SimpleDocTemplate(
+        output_path, pagesize=A4,
+        leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm
+    )
+    title_s, subtitle_s, label_s, body_s = _build_styles()
+    story = []
+
+    story.append(Paragraph("Riepilogo per Corso", title_s))
+    story.append(Paragraph(course_name, subtitle_s))
+    story.append(HRFlowable(width="100%", thickness=1, color=HEADER_COLOR))
+    story.append(Spacer(1, 0.5*cm))
+
+    header = ["Allievo", "Iscrizione", "Ore fatte", "Monte ore", "Completamento"]
+    table_data = [header]
+    for r in rows:
+        total = r["total_hours"]
+        done = r["hours_done"]
+        pct = min((done / total * 100) if total > 0 else 0, 100)
+        table_data.append([r["name"], r["enrollment_date"], f"{done:.1f}", f"{total:.1f}", f"{pct:.1f}%"])
+
+    col_widths = [5.5*cm, 3.0*cm, 2.5*cm, 2.5*cm, 4.0*cm]
+    t = Table(table_data, colWidths=col_widths, repeatRows=1)
+    n = len(table_data)
+
+    row_styles = [
+        ("BACKGROUND", (0, 0), (-1, 0), HEADER_COLOR),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#bdc3c7")),
+        ("ALIGN", (2, 1), (-1, -1), "CENTER"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, n - 1), [colors.white, ROW_ALT_COLOR]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]
+    for i, r in enumerate(rows, start=1):
+        total = r["total_hours"]
+        done = r["hours_done"]
+        pct = min((done / total * 100) if total > 0 else 0, 100)
+        c = _progress_color(pct)
+        row_styles.append(("TEXTCOLOR", (4, i), (4, i), c))
+        row_styles.append(("FONTNAME", (4, i), (4, i), "Helvetica-Bold"))
+
+    t.setStyle(TableStyle(row_styles))
+    story.append(t)
+
+    story.append(Spacer(1, 0.6*cm))
+    story.append(Paragraph(
+        f"Generato il {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        ParagraphStyle("Footer", fontSize=8, textColor=colors.grey)
+    ))
+
+    doc.build(story)

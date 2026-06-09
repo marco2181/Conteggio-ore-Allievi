@@ -1,5 +1,6 @@
+import csv
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from datetime import date
 import customtkinter as ctk
 from tkcalendar import DateEntry
@@ -37,6 +38,12 @@ class StudentsFrame(ctk.CTkFrame):
 
         ctk.CTkButton(top, text="+ Nuovo allievo", width=140,
                       command=self._open_add_dialog).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(top, text="↓ Esporta CSV", width=130,
+                      fg_color="#27ae60", hover_color="#1e8449",
+                      command=self._export_csv).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(top, text="↑ Importa CSV", width=130,
+                      fg_color="#8e44ad", hover_color="#6c3483",
+                      command=self._import_csv).pack(side="right", padx=(8, 0))
         self.archive_toggle = ctk.CTkButton(
             top, text="Mostra archiviati", width=150,
             fg_color="#7f8c8d", hover_color="#636e72",
@@ -133,6 +140,78 @@ class StudentsFrame(ctk.CTkFrame):
                               font=ctk.CTkFont(size=11),
                               fg_color="#e74c3c", hover_color="#c0392b",
                               command=lambda s=stu: self._delete_permanently(s)).pack(side="left", padx=2)
+
+    def _export_csv(self):
+        students = get_all_students(active_only=not self._show_archived)
+        if not students:
+            messagebox.showinfo("Export CSV", "Nessun allievo da esportare.")
+            return
+        output_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv")],
+            initialfile="allievi.csv",
+            title="Esporta allievi in CSV"
+        )
+        if not output_path:
+            return
+        try:
+            with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow(["Nome", "Corso", "Ore fatte", "Ore totali", "% Completamento", "Iscrizione"])
+                for s in students:
+                    total = s["total_hours"]
+                    done = get_student_total_hours(s["id"])
+                    pct = min((done / total * 100) if total > 0 else 0, 100)
+                    course_disp = "Senza corso" if s["course_name"] == SYSTEM_COURSE else s["course_name"]
+                    writer.writerow([s["name"], course_disp, f"{done:.1f}", f"{total:.1f}", f"{pct:.0f}%", s["enrollment_date"]])
+            messagebox.showinfo("Export CSV", f"File salvato:\n{output_path}")
+        except Exception as e:
+            messagebox.showerror("Errore export", str(e))
+
+    def _import_csv(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("CSV", "*.csv"), ("Tutti i file", "*.*")],
+            title="Importa allievi da CSV"
+        )
+        if not file_path:
+            return
+        courses = get_all_courses()
+        course_map = {c["name"].lower(): c["id"] for c in courses}
+        added, skipped = 0, []
+        try:
+            with open(file_path, newline="", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    name = (row.get("Nome") or "").strip()
+                    corso = (row.get("Corso") or "").strip()
+                    ore_str = (row.get("Ore personalizzate") or "").strip()
+                    if not name:
+                        continue
+                    course_id = course_map.get(corso.lower())
+                    if not course_id:
+                        skipped.append(f"{name} (corso '{corso}' non trovato)")
+                        continue
+                    custom_hours = None
+                    if ore_str:
+                        try:
+                            custom_hours = float(ore_str.replace(",", "."))
+                        except ValueError:
+                            pass
+                    try:
+                        add_student(name, course_id, date.today().strftime("%Y-%m-%d"), custom_hours)
+                        added += 1
+                    except ValueError as e:
+                        skipped.append(f"{name} ({e})")
+        except Exception as e:
+            messagebox.showerror("Errore import", str(e))
+            return
+        msg = f"Importati: {added} allievi."
+        if skipped:
+            msg += f"\n\nSaltati ({len(skipped)}):\n" + "\n".join(skipped[:10])
+            if len(skipped) > 10:
+                msg += f"\n... e altri {len(skipped) - 10}"
+        messagebox.showinfo("Import CSV completato", msg)
+        self._refresh_table()
 
     def _delete_permanently(self, student):
         name = student["name"]

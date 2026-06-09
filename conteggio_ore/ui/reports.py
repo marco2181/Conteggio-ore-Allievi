@@ -7,9 +7,10 @@ from tkcalendar import DateEntry
 
 from database.models import (
     get_all_students, get_student, get_student_total_hours,
-    get_student_attendance_in_period, get_monthly_report_data
+    get_student_attendance_in_period, get_monthly_report_data,
+    get_all_courses, get_students_summary
 )
-from logic.pdf_generator import generate_individual_report, generate_monthly_report
+from logic.pdf_generator import generate_individual_report, generate_monthly_report, generate_course_report
 from logic.sessions import MESI
 
 MAIN_BG    = "#f5f6fa"
@@ -39,6 +40,10 @@ class ReportsFrame(ctk.CTkFrame):
         # Registro mensile
         mon_card = self._section_card(inner, "📅  Registro mensile")
         self._build_monthly(mon_card)
+
+        # Report per corso
+        course_card = self._section_card(inner, "📊  Report per corso")
+        self._build_course(course_card)
 
     def _section_card(self, parent, title):
         card = ctk.CTkFrame(parent, fg_color=CARD_BG, corner_radius=10)
@@ -99,6 +104,17 @@ class ReportsFrame(ctk.CTkFrame):
         ctk.CTkButton(row, text="📄  Genera PDF", width=130,
                       command=self._generate_monthly).pack(side="left")
 
+    def _build_course(self, card):
+        row = ctk.CTkFrame(card, fg_color=CARD_BG)
+        row.pack(fill="x", padx=16, pady=(0, 14))
+        ctk.CTkLabel(row, text="Corso:", text_color=HEAD_COLOR, width=80, anchor="w").pack(side="left")
+        self.course_report_var = tk.StringVar(value="—")
+        self.course_report_menu = ctk.CTkOptionMenu(row, variable=self.course_report_var,
+                                                    values=["—"], width=220)
+        self.course_report_menu.pack(side="left", padx=(0, 16))
+        ctk.CTkButton(row, text="📄  Genera PDF", width=130,
+                      command=self._generate_course).pack(side="left")
+
     def on_show(self):
         students = get_all_students(active_only=True)
         self._student_map = {s["name"]: s["id"] for s in students}
@@ -108,6 +124,15 @@ class ReportsFrame(ctk.CTkFrame):
             self.student_var.set(names[0])
         else:
             self.student_var.set("—")
+
+        courses = get_all_courses()
+        self._course_map = {c["name"]: c["id"] for c in courses}
+        cnames = list(self._course_map.keys())
+        self.course_report_menu.configure(values=cnames if cnames else ["—"])
+        if cnames:
+            self.course_report_var.set(cnames[0])
+        else:
+            self.course_report_var.set("—")
 
     def _generate_individual(self):
         name = self.student_var.get()
@@ -146,6 +171,32 @@ class ReportsFrame(ctk.CTkFrame):
 
         try:
             generate_individual_report(output_path, student_info, rows, date_from, date_to)
+            if messagebox.askyesno("PDF generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
+                os.startfile(output_path)
+        except Exception as e:
+            messagebox.showerror("Errore", f"Errore nella generazione del PDF:\n{e}")
+
+    def _generate_course(self):
+        name = self.course_report_var.get()
+        if name == "—" or name not in self._course_map:
+            messagebox.showwarning("Attenzione", "Selezionare un corso.")
+            return
+        course_id = self._course_map[name]
+        rows = get_students_summary(course_id=course_id)
+        if not rows:
+            messagebox.showinfo("Nessun dato", "Nessun allievo attivo per questo corso.")
+            return
+        default_name = f"Report_{name.replace(' ', '_')}.pdf"
+        output_path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            filetypes=[("PDF", "*.pdf")],
+            initialfile=default_name,
+            title="Salva report per corso"
+        )
+        if not output_path:
+            return
+        try:
+            generate_course_report(output_path, name, rows)
             if messagebox.askyesno("PDF generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
                 os.startfile(output_path)
         except Exception as e:

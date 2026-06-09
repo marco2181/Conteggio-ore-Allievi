@@ -184,10 +184,10 @@ def get_student_attendance_history(student_id):
             ORDER BY a.date DESC, se.day_of_week, se.slot
         """, (student_id,)).fetchall()
 
-def get_students_summary():
-    """Ritorna tutti gli allievi attivi con ore totali frequentate."""
+def get_students_summary(course_id=None):
+    """Ritorna tutti gli allievi attivi con ore totali frequentate. Filtro opzionale per corso."""
     with get_connection() as conn:
-        return conn.execute("""
+        q = """
             SELECT s.id, s.name, s.enrollment_date,
                    c.name AS course_name,
                    COALESCE(s.custom_hours, c.total_hours) AS total_hours,
@@ -196,9 +196,13 @@ def get_students_summary():
             JOIN courses c ON s.course_id = c.id
             LEFT JOIN attendance a ON a.student_id = s.id
             WHERE s.active=1
-            GROUP BY s.id
-            ORDER BY s.name
-        """).fetchall()
+        """
+        params = []
+        if course_id is not None:
+            q += " AND s.course_id = ?"
+            params.append(course_id)
+        q += " GROUP BY s.id ORDER BY s.name"
+        return conn.execute(q, params).fetchall()
 
 def get_monthly_report_data(year, month):
     """Dati per il registro mensile: ore del mese + totale cumulativo per allievo."""

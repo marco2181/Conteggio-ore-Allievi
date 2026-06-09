@@ -1,3 +1,4 @@
+import tkinter as tk
 import customtkinter as ctk
 from database.models import (
     get_students_summary, get_all_courses,
@@ -15,6 +16,7 @@ class DashboardFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
         self.app = app
+        self._course_filter_map = {}  # label → course_id (None per "Tutti")
         self._build()
 
     def _build(self):
@@ -25,6 +27,15 @@ class DashboardFrame(ctk.CTkFrame):
         ctk.CTkButton(header, text="↻  Aggiorna", width=110,
                       command=self.on_show).pack(side="right")
 
+        ctk.CTkLabel(header, text="Corso:", text_color=HEAD_COLOR,
+                     font=ctk.CTkFont(size=12)).pack(side="right", padx=(0, 6))
+        self._filter_var = tk.StringVar(value="Tutti i corsi")
+        self._filter_menu = ctk.CTkOptionMenu(
+            header, variable=self._filter_var, values=["Tutti i corsi"],
+            width=180, command=lambda _: self._refresh_table()
+        )
+        self._filter_menu.pack(side="right", padx=(0, 10))
+
         self.stats_frame = ctk.CTkFrame(self, fg_color=MAIN_BG)
         self.stats_frame.pack(fill="x", padx=24, pady=(12, 0))
 
@@ -32,8 +43,20 @@ class DashboardFrame(ctk.CTkFrame):
         self.table_frame.pack(fill="both", expand=True, padx=24, pady=(12, 16))
 
     def on_show(self):
+        self._reload_course_filter()
         self._refresh_stats()
         self._refresh_table()
+
+    def _reload_course_filter(self):
+        courses = get_all_courses()
+        self._course_filter_map = {"Tutti i corsi": None}
+        for c in courses:
+            self._course_filter_map[c["name"]] = c["id"]
+        options = list(self._course_filter_map.keys())
+        current = self._filter_var.get()
+        self._filter_menu.configure(values=options)
+        if current not in self._course_filter_map:
+            self._filter_var.set("Tutti i corsi")
 
     def _refresh_stats(self):
         for w in self.stats_frame.winfo_children():
@@ -60,7 +83,9 @@ class DashboardFrame(ctk.CTkFrame):
         for w in self.table_frame.winfo_children():
             w.destroy()
 
-        rows = get_students_summary()
+        selected_label = self._filter_var.get()
+        course_id = self._course_filter_map.get(selected_label)
+        rows = get_students_summary(course_id=course_id)
 
         completed_names = [r["name"] for r in rows
                            if r["total_hours"] > 0 and r["hours_done"] >= r["total_hours"]]
