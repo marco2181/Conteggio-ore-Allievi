@@ -1,10 +1,13 @@
+import os
 import tkinter as tk
+from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from database.models import (
     get_students_summary, get_all_courses,
     change_student_course, delete_student_permanently, SYSTEM_COURSE
 )
 from logic.sessions import progress_color
+from logic.pdf_generator import generate_certificate
 
 MAIN_BG    = "#f5f6fa"
 CARD_BG    = "#ffffff"
@@ -153,18 +156,49 @@ class DashboardFrame(ctk.CTkFrame):
             if completed:
                 sid = r["id"]
                 sname = r["name"]
+                scourse = r["course_name"]
+                senroll = r["enrollment_date"]
+                sdone = done
+                stotal = total
+                ctk.CTkButton(
+                    actions, text="📜 Attestato", width=96, height=28,
+                    fg_color="#8e44ad", hover_color="#6c3483",
+                    font=ctk.CTkFont(size=11),
+                    command=lambda sid=sid, sname=sname, scourse=scourse, senroll=senroll, sdone=sdone, stotal=stotal:
+                        self._generate_certificate(sname, scourse, senroll, sdone, stotal)
+                ).pack(side="left", padx=(0, 4))
                 ctk.CTkButton(
                     actions, text="Nuovo corso", width=88, height=28,
                     fg_color="#2980b9", hover_color="#1a6fa5",
                     font=ctk.CTkFont(size=11),
                     command=lambda sid=sid, sname=sname: self._open_change_course(sid, sname)
-                ).pack(side="left", padx=(0, 6))
+                ).pack(side="left", padx=(0, 4))
                 ctk.CTkButton(
-                    actions, text="Elimina", width=72, height=28,
+                    actions, text="Elimina", width=66, height=28,
                     fg_color="#e74c3c", hover_color="#c0392b",
                     font=ctk.CTkFont(size=11),
                     command=lambda sid=sid, sname=sname: self._confirm_delete(sid, sname)
                 ).pack(side="left")
+
+    # ── Attestato PDF ─────────────────────────────────────────────────────────
+
+    def _generate_certificate(self, name, course_name, enrollment_date, hours_done, total_hours):
+        safe_name = name.replace(" ", "_")
+        default_file = f"Attestato_{safe_name}.pdf"
+        output_path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            filetypes=[("PDF", "*.pdf")],
+            initialfile=default_file,
+            title="Salva attestato di frequenza"
+        )
+        if not output_path:
+            return
+        try:
+            generate_certificate(output_path, name, course_name, enrollment_date, hours_done, total_hours)
+            if messagebox.askyesno("Attestato generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
+                os.startfile(output_path)
+        except Exception as e:
+            messagebox.showerror("Errore", f"Errore nella generazione dell'attestato:\n{e}")
 
     # ── Dialog: cambio corso ───────────────────────────────────────────────────
 

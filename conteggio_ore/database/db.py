@@ -76,10 +76,14 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_students_course    ON students(course_id);
     """)
 
-    # Migrazione: aggiunge custom_hours se il DB esisteva già senza la colonna
-    cols = [r[1] for r in cur.execute("PRAGMA table_info(students)").fetchall()]
-    if "custom_hours" not in cols:
+    # Migrazioni per colonne aggiunte dopo la creazione iniziale
+    student_cols = [r[1] for r in cur.execute("PRAGMA table_info(students)").fetchall()]
+    if "custom_hours" not in student_cols:
         cur.execute("ALTER TABLE students ADD COLUMN custom_hours REAL DEFAULT NULL")
+
+    course_cols = [r[1] for r in cur.execute("PRAGMA table_info(courses)").fetchall()]
+    if "active" not in course_cols:
+        cur.execute("ALTER TABLE courses ADD COLUMN active INTEGER DEFAULT 1")
 
     # Popola i turni fissi solo se la tabella è vuota
     existing = cur.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]

@@ -205,8 +205,10 @@ class ReportsFrame(ctk.CTkFrame):
     def _generate_monthly(self):
         try:
             year = int(self.year_var.get())
+            if not (2000 <= year <= 2100):
+                raise ValueError
         except ValueError:
-            messagebox.showwarning("Attenzione", "Anno non valido.")
+            messagebox.showwarning("Attenzione", "Anno non valido. Inserire un anno tra 2000 e 2100.")
             return
 
         month = MESI.index(self.month_var.get()) + 1

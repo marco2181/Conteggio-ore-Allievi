@@ -272,3 +272,85 @@ def generate_course_report(output_path, course_name, rows):
     ))
 
     doc.build(story)
+
+
+def generate_certificate(output_path, student_name, course_name, enrollment_date, hours_done, total_hours):
+    from datetime import date as _date
+    doc = SimpleDocTemplate(
+        output_path, pagesize=A4,
+        leftMargin=2.5*cm, rightMargin=2.5*cm, topMargin=3*cm, bottomMargin=3*cm
+    )
+    styles = getSampleStyleSheet()
+
+    cert_title = ParagraphStyle(
+        "CertTitle", parent=styles["Title"],
+        fontSize=26, textColor=HEADER_COLOR, spaceAfter=6, alignment=TA_CENTER,
+        fontName="Helvetica-Bold"
+    )
+    name_style = ParagraphStyle(
+        "CertName", parent=styles["Normal"],
+        fontSize=22, textColor=HEADER_COLOR, spaceAfter=10, alignment=TA_CENTER,
+        fontName="Helvetica-Bold"
+    )
+    course_style = ParagraphStyle(
+        "CertCourse", parent=styles["Normal"],
+        fontSize=16, textColor=HEADER_COLOR, alignment=TA_CENTER,
+        spaceAfter=10, fontName="Helvetica-Bold"
+    )
+    body_style = ParagraphStyle(
+        "CertBody", parent=styles["Normal"],
+        fontSize=12, textColor=colors.black, spaceAfter=8, alignment=TA_CENTER,
+        leading=18
+    )
+    footer_style = ParagraphStyle(
+        "CertFooter", parent=styles["Normal"],
+        fontSize=9, textColor=colors.grey, alignment=TA_CENTER
+    )
+
+    story = []
+    story.append(Spacer(1, 1*cm))
+    story.append(Paragraph("ATTESTATO DI FREQUENZA", cert_title))
+    story.append(HRFlowable(width="80%", thickness=2, color=HEADER_COLOR, hAlign="CENTER"))
+    story.append(Spacer(1, 0.8*cm))
+    story.append(Paragraph("Si attesta che", body_style))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph(student_name.upper(), name_style))
+    story.append(Spacer(1, 0.3*cm))
+    story.append(Paragraph("ha frequentato il corso", body_style))
+    story.append(Paragraph(_course_label(course_name), course_style))
+    story.append(Spacer(1, 0.4*cm))
+
+    info_data = [
+        ["Ore frequentate:", f"{hours_done:.1f} h su {total_hours:.1f} h"],
+        ["Data iscrizione:", enrollment_date],
+        ["Data emissione:", _date.today().strftime("%d/%m/%Y")],
+    ]
+    info_table = Table(info_data, colWidths=[5*cm, 7*cm], hAlign="CENTER")
+    info_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 11),
+        ("TEXTCOLOR", (0, 0), (0, -1), HEADER_COLOR),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 2*cm))
+    story.append(HRFlowable(width="80%", thickness=2, color=colors.HexColor("#bdc3c7"), hAlign="CENTER"))
+    story.append(Spacer(1, 0.6*cm))
+
+    sign_table = Table([["", "Il Responsabile", ""]], colWidths=[5*cm, 7*cm, 5*cm])
+    sign_table.setStyle(TableStyle([
+        ("ALIGN", (1, 0), (1, 0), "CENTER"),
+        ("FONTNAME", (1, 0), (1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (1, 0), (1, 0), 11),
+        ("TEXTCOLOR", (1, 0), (1, 0), HEADER_COLOR),
+    ]))
+    story.append(sign_table)
+    story.append(Spacer(1, 0.4*cm))
+    story.append(Paragraph(
+        f"Generato il {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        footer_style
+    ))
+
+    doc.build(story)

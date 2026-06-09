@@ -132,10 +132,12 @@ class AttendanceFrame(ctk.CTkFrame):
             present = stu_id in existing
             hours_val = str(existing[stu_id]["hours_attended"]) if present else str(sess["default_hours"])
 
+            notes_val = (existing[stu_id]["notes"] or "") if present else ""
             check_var = tk.BooleanVar(value=present)
             hours_var = tk.StringVar(value=hours_val)
+            notes_var = tk.StringVar(value=notes_val)
 
-            self._entries[(stu_id, sid)] = {"check": check_var, "hours": hours_var}
+            self._entries[(stu_id, sid)] = {"check": check_var, "hours": hours_var, "notes": notes_var}
 
             row_bg = "#f8f9fa" if i % 2 == 0 else CARD_BG
             row = ctk.CTkFrame(block, fg_color=row_bg, corner_radius=0)
@@ -148,9 +150,13 @@ class AttendanceFrame(ctk.CTkFrame):
 
             ctk.CTkLabel(row, text="Ore:", text_color=GREY_TEXT,
                          font=ctk.CTkFont(size=11)).pack(side="right", padx=(0, 6))
-            hours_entry = ctk.CTkEntry(row, textvariable=hours_var, width=60,
-                                       font=ctk.CTkFont(size=12), justify="center")
-            hours_entry.pack(side="right", padx=(0, 14), pady=7)
+            ctk.CTkEntry(row, textvariable=hours_var, width=60,
+                         font=ctk.CTkFont(size=12), justify="center").pack(side="right", padx=(0, 14), pady=7)
+            ctk.CTkEntry(row, textvariable=notes_var, width=150,
+                         font=ctk.CTkFont(size=11),
+                         placeholder_text="Note...").pack(side="right", padx=(0, 4), pady=7)
+            ctk.CTkLabel(row, text="Note:", text_color=GREY_TEXT,
+                         font=ctk.CTkFont(size=11)).pack(side="right", padx=(0, 4))
 
     def _save(self):
         date_str = self._selected_date.strftime("%Y-%m-%d")
@@ -169,7 +175,8 @@ class AttendanceFrame(ctk.CTkFrame):
                     hours = float(data["hours"].get().replace(",", "."))
                     if hours <= 0:
                         raise ValueError
-                    upsert_attendance(stu_id, sess_id, date_str, hours)
+                    notes = data.get("notes", tk.StringVar()).get().strip()
+                    upsert_attendance(stu_id, sess_id, date_str, hours, notes)
                     saved += 1
                 except ValueError:
                     errors.append(f"Ore non valide per allievo id={stu_id}")

@@ -4,16 +4,18 @@ from ui.attendance import AttendanceFrame
 from ui.students import StudentsFrame
 from ui.courses import CoursesFrame
 from ui.reports import ReportsFrame
+from ui.settings import SettingsFrame
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
 NAV_ITEMS = [
-    ("Dashboard",  "📊", DashboardFrame),
-    ("Presenze",   "📅", AttendanceFrame),
-    ("Allievi",    "👤", StudentsFrame),
-    ("Corsi",      "📚", CoursesFrame),
-    ("Report PDF", "📄", ReportsFrame),
+    ("Dashboard",    "📊", DashboardFrame),
+    ("Presenze",     "📅", AttendanceFrame),
+    ("Allievi",      "👤", StudentsFrame),
+    ("Corsi",        "📚", CoursesFrame),
+    ("Report PDF",   "📄", ReportsFrame),
+    ("Impostazioni", "⚙️", SettingsFrame),
 ]
 
 SIDEBAR_BG   = "#2c3e50"

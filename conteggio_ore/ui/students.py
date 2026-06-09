@@ -1,4 +1,5 @@
 import csv
+import os
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from datetime import date
@@ -11,6 +12,7 @@ from database.models import (
     get_all_courses, get_student_attendance_history, get_student_total_hours,
     SYSTEM_COURSE, get_system_course_id
 )
+from logic.pdf_generator import generate_certificate
 
 SENZA_CORSO_LABEL = "— Senza corso (ore individuali) —"
 from logic.sessions import day_name, slot_label, progress_color
@@ -120,7 +122,7 @@ class StudentsFrame(ctk.CTkFrame):
                          text_color=color).pack(side="left", padx=8)
 
             # Azioni
-            actions = ctk.CTkFrame(row, fg_color="transparent", width=260)
+            actions = ctk.CTkFrame(row, fg_color="transparent", width=310)
             actions.pack(side="left", padx=8)
             ctk.CTkButton(actions, text="Modifica", width=70, height=28,
                           font=ctk.CTkFont(size=11),
@@ -129,6 +131,14 @@ class StudentsFrame(ctk.CTkFrame):
                           font=ctk.CTkFont(size=11),
                           fg_color="#2980b9", hover_color="#1a6fa8",
                           command=lambda s=stu: self._open_history(s)).pack(side="left", padx=2)
+            if pct >= 100:
+                s_done = done
+                s_total = total
+                ctk.CTkButton(actions, text="📜 Attestato", width=95, height=28,
+                              font=ctk.CTkFont(size=11),
+                              fg_color="#8e44ad", hover_color="#6c3483",
+                              command=lambda s=stu, sd=s_done, st=s_total: self._generate_certificate(s, sd, st)
+                              ).pack(side="left", padx=2)
             arch_label = "Ripristina" if not stu["active"] else "Archivia"
             arch_color = "#27ae60" if not stu["active"] else "#e67e22"
             ctk.CTkButton(actions, text=arch_label, width=70, height=28,
@@ -140,6 +150,27 @@ class StudentsFrame(ctk.CTkFrame):
                               font=ctk.CTkFont(size=11),
                               fg_color="#e74c3c", hover_color="#c0392b",
                               command=lambda s=stu: self._delete_permanently(s)).pack(side="left", padx=2)
+
+    def _generate_certificate(self, student, hours_done, total_hours):
+        name = student["name"]
+        safe_name = name.replace(" ", "_")
+        output_path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            filetypes=[("PDF", "*.pdf")],
+            initialfile=f"Attestato_{safe_name}.pdf",
+            title="Salva attestato di frequenza"
+        )
+        if not output_path:
+            return
+        try:
+            generate_certificate(
+                output_path, name, student["course_name"],
+                student["enrollment_date"], hours_done, total_hours
+            )
+            if messagebox.askyesno("Attestato generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
+                os.startfile(output_path)
+        except Exception as e:
+            messagebox.showerror("Errore", f"Errore nella generazione dell'attestato:\n{e}")
 
     def _export_csv(self):
         students = get_all_students(active_only=not self._show_archived)

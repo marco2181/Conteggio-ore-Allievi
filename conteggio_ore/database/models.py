@@ -6,13 +6,15 @@ SYSTEM_COURSE = "__LIBERO__"
 
 # ─── CORSI ────────────────────────────────────────────────────────────────────
 
-def get_all_courses():
+def get_all_courses(active_only=True):
     """Ritorna tutti i corsi escludendo il corso di sistema."""
     with get_connection() as conn:
-        return conn.execute(
-            "SELECT * FROM courses WHERE name != ? ORDER BY name",
-            (SYSTEM_COURSE,)
-        ).fetchall()
+        q = "SELECT * FROM courses WHERE name != ?"
+        params = [SYSTEM_COURSE]
+        if active_only:
+            q += " AND active=1"
+        q += " ORDER BY name"
+        return conn.execute(q, params).fetchall()
 
 def get_system_course_id():
     with get_connection() as conn:
@@ -32,8 +34,21 @@ def add_course(name, total_hours):
         raise ValueError(f"Esiste già un corso con il nome «{name}».")
 
 def update_course(course_id, name, total_hours):
+    try:
+        with get_connection() as conn:
+            conn.execute("UPDATE courses SET name=?, total_hours=? WHERE id=?", (name, total_hours, course_id))
+            conn.commit()
+    except sqlite3.IntegrityError:
+        raise ValueError(f"Esiste già un corso con il nome «{name}».")
+
+def archive_course(course_id):
     with get_connection() as conn:
-        conn.execute("UPDATE courses SET name=?, total_hours=? WHERE id=?", (name, total_hours, course_id))
+        conn.execute("UPDATE courses SET active=0 WHERE id=?", (course_id,))
+        conn.commit()
+
+def restore_course(course_id):
+    with get_connection() as conn:
+        conn.execute("UPDATE courses SET active=1 WHERE id=?", (course_id,))
         conn.commit()
 
 def delete_course(course_id):
@@ -42,10 +57,10 @@ def delete_course(course_id):
         if course and course["name"] == SYSTEM_COURSE:
             raise ValueError("Impossibile eliminare il corso di sistema.")
         students = conn.execute(
-            "SELECT COUNT(*) FROM students WHERE course_id=? AND active=1", (course_id,)
+            "SELECT COUNT(*) FROM students WHERE course_id=?", (course_id,)
         ).fetchone()[0]
         if students > 0:
-            raise ValueError("Impossibile eliminare: ci sono allievi iscritti a questo corso.")
+            raise ValueError("Impossibile eliminare: ci sono allievi (anche archiviati) iscritti a questo corso.")
         conn.execute("DELETE FROM courses WHERE id=?", (course_id,))
         conn.commit()
 
@@ -89,12 +104,15 @@ def add_student(name, course_id, enrollment_date, custom_hours=None):
         raise ValueError(f"Impossibile aggiungere l'allievo: {e}")
 
 def update_student(student_id, name, course_id, enrollment_date, custom_hours=None):
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE students SET name=?, course_id=?, enrollment_date=?, custom_hours=? WHERE id=?",
-            (name, course_id, enrollment_date, custom_hours, student_id)
-        )
-        conn.commit()
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE students SET name=?, course_id=?, enrollment_date=?, custom_hours=? WHERE id=?",
+                (name, course_id, enrollment_date, custom_hours, student_id)
+            )
+            conn.commit()
+    except sqlite3.IntegrityError as e:
+        raise ValueError(f"Impossibile aggiornare l'allievo: {e}")
 
 def archive_student(student_id):
     with get_connection() as conn:
@@ -220,6 +238,33 @@ def get_monthly_report_data(year, month):
             GROUP BY s.id
             ORDER BY s.name
         """, (month_str + "%",)).fetchall()
+
+def add_session(day_of_week, slot, default_hours):
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO sessions (day_of_week, slot, default_hours) VALUES (?, ?, ?)",
+            (day_of_week, slot, default_hours)
+        )
+        conn.commit()
+
+def update_session(session_id, day_of_week, slot, default_hours):
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE sessions SET day_of_week=?, slot=?, default_hours=? WHERE id=?",
+            (day_of_week, slot, default_hours, session_id)
+        )
+        conn.commit()
+
+def delete_session(session_id):
+    with get_connection() as conn:
+        linked = conn.execute(
+            "SELECT COUNT(*) FROM attendance WHERE session_id=?", (session_id,)
+        ).fetchone()[0]
+        if linked > 0:
+            raise ValueError("Impossibile eliminare: esistono presenze registrate per questo turno.")
+        conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+        conn.commit()
+
 
 def get_student_attendance_in_period(student_id, date_from, date_to):
     with get_connection() as conn:
