@@ -1,0 +1,23 @@
+# Database (dati privati)
+conteggio_ore/data/
+
+# Build output
+conteggio_ore/dist/
+conteggio_ore/build/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Claude Code
+.claude/
+
+# Virtual environment
+venv/
+.venv/
+
+# Windows
+Thumbs.db
+desktop.ini
