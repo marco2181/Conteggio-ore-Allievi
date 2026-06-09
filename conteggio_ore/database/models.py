@@ -1,3 +1,4 @@
+import sqlite3
 from .db import get_connection
 
 SYSTEM_COURSE = "__LIBERO__"
@@ -23,9 +24,12 @@ def get_course(course_id):
         return conn.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
 
 def add_course(name, total_hours):
-    with get_connection() as conn:
-        conn.execute("INSERT INTO courses (name, total_hours) VALUES (?, ?)", (name, total_hours))
-        conn.commit()
+    try:
+        with get_connection() as conn:
+            conn.execute("INSERT INTO courses (name, total_hours) VALUES (?, ?)", (name, total_hours))
+            conn.commit()
+    except sqlite3.IntegrityError:
+        raise ValueError(f"Esiste già un corso con il nome «{name}».")
 
 def update_course(course_id, name, total_hours):
     with get_connection() as conn:
@@ -74,12 +78,15 @@ def get_student(student_id):
         """, (student_id,)).fetchone()
 
 def add_student(name, course_id, enrollment_date, custom_hours=None):
-    with get_connection() as conn:
-        conn.execute(
-            "INSERT INTO students (name, course_id, enrollment_date, custom_hours) VALUES (?, ?, ?, ?)",
-            (name, course_id, enrollment_date, custom_hours)
-        )
-        conn.commit()
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO students (name, course_id, enrollment_date, custom_hours) VALUES (?, ?, ?, ?)",
+                (name, course_id, enrollment_date, custom_hours)
+            )
+            conn.commit()
+    except sqlite3.IntegrityError as e:
+        raise ValueError(f"Impossibile aggiungere l'allievo: {e}")
 
 def update_student(student_id, name, course_id, enrollment_date, custom_hours=None):
     with get_connection() as conn:

@@ -10,14 +10,12 @@ from database.models import (
     get_student_attendance_in_period, get_monthly_report_data
 )
 from logic.pdf_generator import generate_individual_report, generate_monthly_report
+from logic.sessions import MESI
 
 MAIN_BG    = "#f5f6fa"
 CARD_BG    = "#ffffff"
 HEAD_COLOR = "#2c3e50"
 GREY_TEXT  = "#7f8c8d"
-
-MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
-        "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
 
 
 class ReportsFrame(ctk.CTkFrame):

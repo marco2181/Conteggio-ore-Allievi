@@ -9,7 +9,7 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
-from logic.sessions import day_name, slot_label
+from logic.sessions import day_name, slot_label, progress_color as _pct_to_hex, MESI
 from database.models import SYSTEM_COURSE
 
 def _course_label(name):
@@ -23,11 +23,7 @@ ACCENT_RED = colors.HexColor("#e74c3c")
 
 
 def _progress_color(pct):
-    if pct >= 100:
-        return ACCENT_RED
-    elif pct >= 80:
-        return ACCENT_ORANGE
-    return ACCENT_GREEN
+    return colors.HexColor(_pct_to_hex(pct))
 
 
 def _build_styles():
@@ -148,9 +144,6 @@ def generate_monthly_report(output_path, rows, year, month):
     """
     rows: lista di dict-like con id, name, course_name, total_hours, hours_month, hours_total
     """
-    MESI = ["", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
-            "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
-
     doc = SimpleDocTemplate(
         output_path, pagesize=A4,
         leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm
@@ -159,7 +152,7 @@ def generate_monthly_report(output_path, rows, year, month):
     story = []
 
     story.append(Paragraph("Registro Mensile Presenze", title_s))
-    story.append(Paragraph(f"{MESI[month]} {year}", subtitle_s))
+    story.append(Paragraph(f"{MESI[month - 1]} {year}", subtitle_s))
     story.append(HRFlowable(width="100%", thickness=1, color=HEADER_COLOR))
     story.append(Spacer(1, 0.5*cm))
 

@@ -69,6 +69,13 @@ def init_db():
         );
     """)
 
+    cur.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(student_id);
+        CREATE INDEX IF NOT EXISTS idx_attendance_date    ON attendance(date);
+        CREATE INDEX IF NOT EXISTS idx_students_active    ON students(active);
+        CREATE INDEX IF NOT EXISTS idx_students_course    ON students(course_id);
+    """)
+
     # Migrazione: aggiunge custom_hours se il DB esisteva già senza la colonna
     cols = [r[1] for r in cur.execute("PRAGMA table_info(students)").fetchall()]
     if "custom_hours" not in cols:
