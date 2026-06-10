@@ -10,7 +10,6 @@ from database.models import (
     get_student_attendance_in_period, get_monthly_report_data,
     get_all_courses, get_students_summary
 )
-from logic.pdf_generator import generate_individual_report, generate_monthly_report, generate_course_report
 from logic.sessions import MESI
 
 MAIN_BG    = "#f5f6fa"
@@ -170,6 +169,7 @@ class ReportsFrame(ctk.CTkFrame):
             return
 
         try:
+            from logic.pdf_generator import generate_individual_report
             generate_individual_report(output_path, student_info, rows, date_from, date_to)
             if messagebox.askyesno("PDF generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
                 os.startfile(output_path)
@@ -196,6 +196,7 @@ class ReportsFrame(ctk.CTkFrame):
         if not output_path:
             return
         try:
+            from logic.pdf_generator import generate_course_report
             generate_course_report(output_path, name, rows)
             if messagebox.askyesno("PDF generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
                 os.startfile(output_path)
@@ -229,6 +230,7 @@ class ReportsFrame(ctk.CTkFrame):
             return
 
         try:
+            from logic.pdf_generator import generate_monthly_report
             generate_monthly_report(output_path, rows, year, month)
             if messagebox.askyesno("PDF generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
                 os.startfile(output_path)

@@ -7,10 +7,11 @@ from tkcalendar import DateEntry
 from database.models import (
     get_all_students, get_sessions_for_day,
     get_attendance_for_date_session,
-    upsert_attendance, delete_attendance,
+    save_attendance_batch,
     get_students_summary
 )
 from logic.sessions import day_name, slot_label
+from ui.style import font
 
 MAIN_BG    = "#f5f6fa"
 CARD_BG    = "#ffffff"
@@ -24,6 +25,7 @@ class AttendanceFrame(ctk.CTkFrame):
         self.app = app
         self._selected_date = date.today()
         self._entries = {}   # (student_id, session_id) -> {"check": BooleanVar, "hours": StringVar}
+        self._search_job = None   # id dell'after in attesa (debounce ricerca)
         self._build()
 
     def _build(self):
@@ -42,14 +44,14 @@ class AttendanceFrame(ctk.CTkFrame):
         search_bar.pack(fill="x", padx=24, pady=(8, 0))
         ctk.CTkLabel(search_bar, text="Cerca allievo:",
                      text_color=HEAD_COLOR,
-                     font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 8))
+                     font=font(12)).pack(side="left", padx=(0, 8))
         self._search_var = tk.StringVar()
         ctk.CTkEntry(search_bar, textvariable=self._search_var,
                      width=240, placeholder_text="Nome...").pack(side="left")
         ctk.CTkButton(search_bar, text="✕", width=28, height=28,
                       fg_color="#bdc3c7", hover_color="#95a5a6", text_color="#2c3e50",
                       command=lambda: self._search_var.set("")).pack(side="left", padx=(4, 0))
-        self._search_var.trace_add("write", lambda *_: self.after(350, self._load_day))
+        self._search_var.trace_add("write", lambda *_: self._on_search_changed())
         ctk.CTkLabel(date_frame, text="Data:", text_color=HEAD_COLOR,
                      font=ctk.CTkFont(size=13)).pack(side="left", padx=(0, 6))
         self.date_picker = DateEntry(
@@ -80,7 +82,15 @@ class AttendanceFrame(ctk.CTkFrame):
     def on_show(self):
         self._load_day()
 
+    def _on_search_changed(self):
+        # Debounce: annulla la ricarica in attesa, riparte il timer.
+        # Senza questo ogni tasto digitato ricostruiva l'intera pagina.
+        if self._search_job is not None:
+            self.after_cancel(self._search_job)
+        self._search_job = self.after(300, self._load_day)
+
     def _load_day(self):
+        self._search_job = None
         try:
             self._selected_date = self.date_picker.get_date()
         except Exception:
@@ -161,23 +171,22 @@ class AttendanceFrame(ctk.CTkFrame):
             row.pack(fill="x", padx=2)
 
             ctk.CTkCheckBox(row, text=stu["name"], variable=check_var,
-                            font=ctk.CTkFont(size=12),
+                            font=font(12),
                             fg_color="#2980b9", hover_color="#1a6fa8",
                             checkmark_color="white").pack(side="left", padx=14, pady=7)
 
             ctk.CTkLabel(row, text="Ore:", text_color=GREY_TEXT,
-                         font=ctk.CTkFont(size=11)).pack(side="right", padx=(0, 6))
+                         font=font(11)).pack(side="right", padx=(0, 6))
             ctk.CTkEntry(row, textvariable=hours_var, width=60,
-                         font=ctk.CTkFont(size=12), justify="center").pack(side="right", padx=(0, 14), pady=7)
+                         font=font(12), justify="center").pack(side="right", padx=(0, 14), pady=7)
             ctk.CTkEntry(row, textvariable=notes_var, width=150,
-                         font=ctk.CTkFont(size=11),
+                         font=font(11),
                          placeholder_text="Note...").pack(side="right", padx=(0, 4), pady=7)
             ctk.CTkLabel(row, text="Note:", text_color=GREY_TEXT,
-                         font=ctk.CTkFont(size=11)).pack(side="right", padx=(0, 4))
+                         font=font(11)).pack(side="right", padx=(0, 4))
 
     def _save(self):
         date_str = self._selected_date.strftime("%Y-%m-%d")
-        saved = 0
         errors = []
 
         # Snapshot percentuali PRIMA del salvataggio
@@ -186,19 +195,23 @@ class AttendanceFrame(ctk.CTkFrame):
             for r in get_students_summary()
         }
 
+        saves, deletes = [], []
         for (stu_id, sess_id), data in self._entries.items():
             if data["check"].get():
                 try:
                     hours = float(data["hours"].get().replace(",", "."))
                     if hours <= 0:
                         raise ValueError
-                    notes = data.get("notes", tk.StringVar()).get().strip()
-                    upsert_attendance(stu_id, sess_id, date_str, hours, notes)
-                    saved += 1
+                    notes = data["notes"].get().strip()
+                    saves.append((stu_id, sess_id, date_str, hours, notes))
                 except ValueError:
                     errors.append(f"Ore non valide per allievo id={stu_id}")
             else:
-                delete_attendance(stu_id, sess_id, date_str)
+                deletes.append((stu_id, sess_id, date_str))
+
+        # Unica transazione: molto più veloce di un commit per allievo
+        save_attendance_batch(saves, deletes)
+        saved = len(saves)
 
         if errors:
             messagebox.showwarning("Attenzione", "\n".join(errors))

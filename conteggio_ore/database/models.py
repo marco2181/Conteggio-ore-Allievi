@@ -191,6 +191,35 @@ def get_student_total_hours(student_id):
         ).fetchone()[0]
         return result
 
+def get_attendance_totals():
+    """Ore totali frequentate per ogni allievo in una sola query: {student_id: ore}."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT student_id, SUM(hours_attended) AS total FROM attendance GROUP BY student_id"
+        ).fetchall()
+        return {r["student_id"]: r["total"] for r in rows}
+
+def save_attendance_batch(saves, deletes):
+    """Salva/elimina presenze in un'unica transazione.
+
+    saves:   lista di tuple (student_id, session_id, date, hours_attended, notes)
+    deletes: lista di tuple (student_id, session_id, date)
+    """
+    with get_connection() as conn:
+        if saves:
+            conn.executemany("""
+                INSERT INTO attendance (student_id, session_id, date, hours_attended, notes)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(student_id, session_id, date)
+                DO UPDATE SET hours_attended=excluded.hours_attended, notes=excluded.notes
+            """, saves)
+        if deletes:
+            conn.executemany(
+                "DELETE FROM attendance WHERE student_id=? AND session_id=? AND date=?",
+                deletes
+            )
+        conn.commit()
+
 def get_student_attendance_history(student_id):
     with get_connection() as conn:
         return conn.execute("""

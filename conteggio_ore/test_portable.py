@@ -1,10 +1,19 @@
-import sys, os
+"""Test funzionali + verifica build portatile.
 
-dist_dir = r'C:\Users\marco_obm8qni\Desktop\Conteggio ore allievi\conteggio_ore\dist\ConteggioOreAllievi'
-db_dir   = os.path.join(dist_dir, 'data')
-db_path  = os.path.join(db_dir, 'conteggio_ore.db')
+Usa un database temporaneo (creato pulito a ogni esecuzione, quindi il test
+è rieseguibile) e NON scrive mai dentro dist/: la cartella portatile da
+distribuire resta pulita.
+"""
+import sys, os, shutil, tempfile
 
-sys.path.insert(0, r'C:\Users\marco_obm8qni\Desktop\Conteggio ore allievi\conteggio_ore')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DIST_DIR = os.path.join(BASE_DIR, "dist", "ConteggioOreAllievi")
+
+# DB temporaneo, fresco a ogni esecuzione
+_tmp_dir = tempfile.mkdtemp(prefix="conteggio_test_")
+db_path = os.path.join(_tmp_dir, "data", "conteggio_ore.db")
+
+sys.path.insert(0, BASE_DIR)
 import database.db as dbmod
 dbmod.DB_PATH = db_path
 
@@ -32,7 +41,7 @@ print('=' * 50)
 try:
     init_db()
     assert os.path.exists(db_path)
-    ok(1, f'init_db + DB creato in dist/')
+    ok(1, 'init_db + DB creato')
 except Exception as e:
     fail(1, str(e))
 
@@ -46,10 +55,7 @@ except Exception as e:
 
 # 3. Corso normale
 try:
-    try:
-        m.add_course('Corso 90h', 90)
-    except Exception:
-        pass  # gia esiste
+    m.add_course('Corso 90h', 90)
     courses = m.get_all_courses()
     names = [c['name'] for c in courses]
     assert '__LIBERO__' not in names
@@ -60,10 +66,7 @@ except Exception as e:
 
 # 4. Allievo SENZA CORSO con 45h custom
 try:
-    try:
-        m.add_student('Mario Rossi', sys_id, '2026-01-10', custom_hours=45)
-    except Exception:
-        pass
+    m.add_student('Mario Rossi', sys_id, '2026-01-10', custom_hours=45)
     summary = m.get_students_summary()
     mario = next((s for s in summary if 'Mario' in s['name']), None)
     assert mario is not None
@@ -75,10 +78,7 @@ except Exception as e:
 # 5. Allievo CON CORSO NORMALE (usa ore del corso)
 try:
     cid = m.get_all_courses()[0]['id']
-    try:
-        m.add_student('Anna Verdi', cid, '2026-02-01')
-    except Exception:
-        pass
+    m.add_student('Anna Verdi', cid, '2026-02-01')
     summary = m.get_students_summary()
     anna = next((s for s in summary if 'Anna' in s['name']), None)
     assert anna is not None
@@ -93,17 +93,19 @@ try:
     assert sessions
     sess = sessions[0]
     mario = next(s for s in m.get_students_summary() if 'Mario' in s['name'])
+    # 11 presenze da 3h = 33h su 45h (73%): sotto la soglia dell'80%,
+    # così il test 7 può verificare l'attraversamento con la 12ª presenza
     dates = [
         '2026-03-02','2026-03-09','2026-03-16','2026-03-23','2026-03-30',
         '2026-04-06','2026-04-13','2026-04-20','2026-04-27',
-        '2026-05-04','2026-05-11','2026-05-18',
+        '2026-05-04','2026-05-11',
     ]
     for d in dates:
         m.upsert_attendance(mario['id'], sess['id'], d, 3.0)
     summary2 = m.get_students_summary()
     mario2 = next(s for s in summary2 if 'Mario' in s['name'])
     expected_h = len(dates) * 3.0
-    assert mario2['hours_done'] >= expected_h, f'attese >={expected_h}, trovate {mario2["hours_done"]}'
+    assert mario2['hours_done'] == expected_h, f'attese {expected_h}, trovate {mario2["hours_done"]}'
     ok(6, f'Presenze registrate: {mario2["hours_done"]}h su {mario2["total_hours"]}h')
 except Exception as e:
     fail(6, str(e))
@@ -122,6 +124,7 @@ try:
     pct_after = mario3['hours_done'] / mario3['total_hours'] * 100
 
     crossed = snap.get(mario3['id'], 0) < 80 <= pct_after
+    assert crossed, f'prima={pct_before:.0f}% dopo={pct_after:.0f}%'
     ok(7, f'Crossing 80%: prima={pct_before:.0f}% dopo={pct_after:.0f}% rilevato={crossed}')
 except Exception as e:
     fail(7, str(e))
@@ -193,13 +196,46 @@ try:
 except Exception as e:
     fail(13, str(e))
 
-# 14. DB accanto all'exe (persistenza portatile)
+# 14. Salvataggio presenze in batch (transazione unica)
 try:
-    assert os.path.exists(db_path)
-    size_kb = os.path.getsize(db_path) / 1024
-    ok(14, f'DB in dist/ ({size_kb:.0f} KB) - dati persistenti OK')
+    anna = next(s for s in m.get_all_students(active_only=True) if 'Anna' in s['name'])
+    mario = next(s for s in m.get_all_students(active_only=True) if 'Mario' in s['name'])
+    m.save_attendance_batch(
+        [(anna['id'], sess['id'], '2026-06-01', 3.0, 'batch'),
+         (mario['id'], sess['id'], '2026-06-01', 2.5, '')],
+        []
+    )
+    totals = m.get_attendance_totals()
+    assert totals[anna['id']] == 3.0
+    # Upsert su conflitto + cancellazione nello stesso batch
+    m.save_attendance_batch(
+        [(anna['id'], sess['id'], '2026-06-01', 4.0, 'mod')],
+        [(mario['id'], sess['id'], '2026-06-01')]
+    )
+    totals = m.get_attendance_totals()
+    assert totals[anna['id']] == 4.0
+    ok(14, 'Salvataggio batch + totali per allievo OK')
 except Exception as e:
     fail(14, str(e))
+
+# 15. Build portatile presente e completa (solo verifica, nessuna scrittura)
+try:
+    exe = os.path.join(DIST_DIR, 'ConteggioOreAllievi.exe')
+    if not os.path.exists(exe):
+        ok(15, 'Build portatile non presente (eseguire build_portable.bat) — saltato')
+    else:
+        internal = os.path.join(DIST_DIR, '_internal')
+        for needed in ('customtkinter', 'babel'):
+            assert os.path.isdir(os.path.join(internal, needed)), f'manca {needed} in _internal'
+        stray_db = os.path.join(DIST_DIR, 'data', 'conteggio_ore.db')
+        if os.path.exists(stray_db):
+            print(f'  [WARN] dist/ contiene un database ({stray_db}): non distribuirlo se sono dati di test')
+        ok(15, 'Build portatile: exe + asset customtkinter/babel presenti')
+except Exception as e:
+    fail(15, str(e))
+
+# Pulizia DB temporaneo
+shutil.rmtree(_tmp_dir, ignore_errors=True)
 
 print()
 print('=' * 50)

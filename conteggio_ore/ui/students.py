@@ -10,12 +10,13 @@ from database.models import (
     get_all_students, get_student, add_student, update_student,
     archive_student, restore_student,
     get_all_courses, get_student_attendance_history, get_student_total_hours,
+    get_attendance_totals,
     SYSTEM_COURSE, get_system_course_id
 )
-from logic.pdf_generator import generate_certificate
 
 SENZA_CORSO_LABEL = "— Senza corso (ore individuali) —"
 from logic.sessions import day_name, slot_label, progress_color
+from ui.style import font
 
 
 def _popup_focus(win):
@@ -36,6 +37,7 @@ class StudentsFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
         self.app = app
         self._show_archived = False
+        self._search_job = None   # id dell'after in attesa (debounce ricerca)
         self._build()
 
     def _build(self):
@@ -66,7 +68,7 @@ class StudentsFrame(ctk.CTkFrame):
         search_frame.pack(fill="x", padx=24, pady=(10, 0))
         ctk.CTkLabel(search_frame, text="Cerca:", text_color=HEAD_COLOR).pack(side="left", padx=(0, 6))
         self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self._refresh_table())
+        self.search_var.trace_add("write", lambda *_: self._on_search_changed())
         ctk.CTkEntry(search_frame, textvariable=self.search_var, width=250,
                      placeholder_text="Nome allievo...").pack(side="left")
 
@@ -77,6 +79,12 @@ class StudentsFrame(ctk.CTkFrame):
     def on_show(self):
         self._refresh_table()
 
+    def _on_search_changed(self):
+        # Debounce: senza, ogni tasto digitato ricostruiva l'intera tabella.
+        if self._search_job is not None:
+            self.after_cancel(self._search_job)
+        self._search_job = self.after(300, self._refresh_table)
+
     def _toggle_archived(self):
         self._show_archived = not self._show_archived
         self.archive_toggle.configure(
@@ -85,12 +93,14 @@ class StudentsFrame(ctk.CTkFrame):
         self._refresh_table()
 
     def _refresh_table(self):
+        self._search_job = None
         for w in self.scroll.winfo_children():
             w.destroy()
 
         search = self.search_var.get().lower()
         students = get_all_students(active_only=not self._show_archived)
         students = [s for s in students if search in s["name"].lower()]
+        hours_by_student = get_attendance_totals()
 
         # Header
         cols = ["Nome allievo", "Corso", "Ore fatte / Totali", "% Completamento", "Azioni"]
@@ -99,7 +109,7 @@ class StudentsFrame(ctk.CTkFrame):
         hdr.pack(fill="x", pady=(0, 2))
         for col, w in zip(cols, widths):
             ctk.CTkLabel(hdr, text=col, width=w,
-                         font=ctk.CTkFont(size=11, weight="bold"),
+                         font=font(11, "bold"),
                          text_color="white", anchor="w").pack(side="left", padx=8, pady=7)
 
         if not students:
@@ -109,7 +119,7 @@ class StudentsFrame(ctk.CTkFrame):
 
         for i, stu in enumerate(students):
             total = stu["total_hours"]
-            done = get_student_total_hours(stu["id"])
+            done = hours_by_student.get(stu["id"], 0)
             pct = min((done / total * 100) if total > 0 else 0, 100)
             color = progress_color(pct)
 
@@ -119,43 +129,43 @@ class StudentsFrame(ctk.CTkFrame):
 
             course_display = "Senza corso" if stu["course_name"] == SYSTEM_COURSE else stu["course_name"]
             ctk.CTkLabel(row, text=stu["name"], width=200, anchor="w",
-                         font=ctk.CTkFont(size=12, weight="bold" if not stu["active"] else "normal"),
+                         font=font(12, "bold" if not stu["active"] else "normal"),
                          text_color=GREY_TEXT if not stu["active"] else "black").pack(side="left", padx=8, pady=7)
             ctk.CTkLabel(row, text=course_display, width=180, anchor="w",
-                         font=ctk.CTkFont(size=11), text_color=GREY_TEXT).pack(side="left", padx=8)
+                         font=font(11), text_color=GREY_TEXT).pack(side="left", padx=8)
             ctk.CTkLabel(row, text=f"{done:.1f} / {total:.1f} h", width=160, anchor="center",
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+                         font=font(11)).pack(side="left", padx=8)
             ctk.CTkLabel(row, text=f"{pct:.0f}%", width=130, anchor="center",
-                         font=ctk.CTkFont(size=12, weight="bold"),
+                         font=font(12, "bold"),
                          text_color=color).pack(side="left", padx=8)
 
             # Azioni
             actions = ctk.CTkFrame(row, fg_color="transparent", width=310)
             actions.pack(side="left", padx=8)
             ctk.CTkButton(actions, text="Modifica", width=70, height=28,
-                          font=ctk.CTkFont(size=11),
+                          font=font(11),
                           command=lambda s=stu: self._open_edit_dialog(s)).pack(side="left", padx=2)
             ctk.CTkButton(actions, text="Storico", width=65, height=28,
-                          font=ctk.CTkFont(size=11),
+                          font=font(11),
                           fg_color="#2980b9", hover_color="#1a6fa8",
                           command=lambda s=stu: self._open_history(s)).pack(side="left", padx=2)
             if pct >= 100:
                 s_done = done
                 s_total = total
                 ctk.CTkButton(actions, text="📜 Attestato", width=95, height=28,
-                              font=ctk.CTkFont(size=11),
+                              font=font(11),
                               fg_color="#8e44ad", hover_color="#6c3483",
                               command=lambda s=stu, sd=s_done, st=s_total: self._generate_certificate(s, sd, st)
                               ).pack(side="left", padx=2)
             arch_label = "Ripristina" if not stu["active"] else "Archivia"
             arch_color = "#27ae60" if not stu["active"] else "#e67e22"
             ctk.CTkButton(actions, text=arch_label, width=70, height=28,
-                          font=ctk.CTkFont(size=11),
+                          font=font(11),
                           fg_color=arch_color, hover_color="#e67e22" if stu["active"] else "#1e8449",
                           command=lambda s=stu: self._toggle_archive(s)).pack(side="left", padx=2)
             if not stu["active"]:
                 ctk.CTkButton(actions, text="Elimina", width=65, height=28,
-                              font=ctk.CTkFont(size=11),
+                              font=font(11),
                               fg_color="#e74c3c", hover_color="#c0392b",
                               command=lambda s=stu: self._delete_permanently(s)).pack(side="left", padx=2)
 
@@ -171,6 +181,7 @@ class StudentsFrame(ctk.CTkFrame):
         if not output_path:
             return
         try:
+            from logic.pdf_generator import generate_certificate
             generate_certificate(
                 output_path, name, student["course_name"],
                 student["enrollment_date"], hours_done, total_hours
@@ -194,12 +205,13 @@ class StudentsFrame(ctk.CTkFrame):
         if not output_path:
             return
         try:
+            hours_by_student = get_attendance_totals()
             with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
                 writer.writerow(["Nome", "Corso", "Ore fatte", "Ore totali", "% Completamento", "Iscrizione", "Ore personalizzate"])
                 for s in students:
                     total = s["total_hours"]
-                    done = get_student_total_hours(s["id"])
+                    done = hours_by_student.get(s["id"], 0)
                     pct = min((done / total * 100) if total > 0 else 0, 100)
                     course_disp = "Senza corso" if s["course_name"] == SYSTEM_COURSE else s["course_name"]
                     custom = f"{s['custom_hours']:.1f}" if s["custom_hours"] is not None else ""
@@ -366,7 +378,7 @@ class StudentDialog(ctk.CTkToplevel):
         hours_row = ctk.CTkFrame(self, fg_color="transparent")
         hours_row.pack(fill="x", padx=24, pady=(0, 6))
         self._hours_label = ctk.CTkLabel(hours_row, text="Ore totali:", text_color="#7f8c8d",
-                                         font=ctk.CTkFont(size=11))
+                                         font=font(11))
         self._hours_label.pack(side="left", padx=(0, 6))
         self.custom_hours_var = tk.StringVar(value="")
         self.custom_hours_entry = ctk.CTkEntry(hours_row, textvariable=self.custom_hours_var,
@@ -374,7 +386,7 @@ class StudentDialog(ctk.CTkToplevel):
                                                font=ctk.CTkFont(size=12), justify="center")
         self.custom_hours_entry.pack(side="left")
         self.default_label = ctk.CTkLabel(hours_row, text="", text_color="#7f8c8d",
-                                          font=ctk.CTkFont(size=10))
+                                          font=font(10))
         self.default_label.pack(side="left", padx=8)
 
         # Precompila se allievo con custom_hours già impostato
@@ -516,7 +528,7 @@ class HistoryDialog(ctk.CTkToplevel):
         hdr = ctk.CTkFrame(scroll, fg_color="#2c3e50", corner_radius=6)
         hdr.pack(fill="x", pady=(0, 2))
         for col, w in zip(cols, widths):
-            ctk.CTkLabel(hdr, text=col, width=w, font=ctk.CTkFont(size=11, weight="bold"),
+            ctk.CTkLabel(hdr, text=col, width=w, font=font(11, "bold"),
                          text_color="white", anchor="w").pack(side="left", padx=8, pady=6)
 
         if not rows:
@@ -529,12 +541,12 @@ class HistoryDialog(ctk.CTkToplevel):
             row = ctk.CTkFrame(scroll, fg_color=bg, corner_radius=4)
             row.pack(fill="x", pady=1)
             ctk.CTkLabel(row, text=r["date"], width=90, anchor="w",
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=8, pady=5)
+                         font=font(11)).pack(side="left", padx=8, pady=5)
             ctk.CTkLabel(row, text=day_name(r["day_of_week"]), width=100, anchor="w",
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+                         font=font(11)).pack(side="left", padx=8)
             ctk.CTkLabel(row, text=slot_label(r["slot"]), width=100, anchor="w",
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+                         font=font(11)).pack(side="left", padx=8)
             ctk.CTkLabel(row, text=f"{r['hours_attended']:.1f}", width=60, anchor="center",
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+                         font=font(11)).pack(side="left", padx=8)
             ctk.CTkLabel(row, text=r["notes"] or "", width=200, anchor="w",
-                         font=ctk.CTkFont(size=10), text_color="#7f8c8d").pack(side="left", padx=8)
+                         font=font(10), text_color="#7f8c8d").pack(side="left", padx=8)

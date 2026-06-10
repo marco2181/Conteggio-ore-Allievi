@@ -7,7 +7,7 @@ from database.models import (
     change_student_course, delete_student_permanently, SYSTEM_COURSE
 )
 from logic.sessions import progress_color
-from logic.pdf_generator import generate_certificate
+from ui.style import font
 
 
 def _popup_focus(win):
@@ -39,7 +39,7 @@ class DashboardFrame(ctk.CTkFrame):
                       command=self.on_show).pack(side="right")
 
         ctk.CTkLabel(header, text="Corso:", text_color=HEAD_COLOR,
-                     font=ctk.CTkFont(size=12)).pack(side="right", padx=(0, 6))
+                     font=font(12)).pack(side="right", padx=(0, 6))
         self._filter_var = tk.StringVar(value="Tutti i corsi")
         self._filter_menu = ctk.CTkOptionMenu(
             header, variable=self._filter_var, values=["Tutti i corsi"],
@@ -85,9 +85,9 @@ class DashboardFrame(ctk.CTkFrame):
         ]:
             card = ctk.CTkFrame(self.stats_frame, fg_color=CARD_BG, corner_radius=10)
             card.pack(side="left", padx=(0, 12), pady=4, ipadx=14, ipady=10)
-            ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=28, weight="bold"),
+            ctk.CTkLabel(card, text=value, font=font(28, "bold"),
                          text_color=color).pack()
-            ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=11),
+            ctk.CTkLabel(card, text=title, font=font(11),
                          text_color=GREY_TEXT).pack()
 
     def _refresh_table(self):
@@ -106,7 +106,7 @@ class DashboardFrame(ctk.CTkFrame):
             ctk.CTkLabel(notif,
                          text="🎓  Corso completato: " + ", ".join(completed_names),
                          text_color="#c0392b",
-                         font=ctk.CTkFont(size=12, weight="bold")).pack(padx=12, pady=8)
+                         font=font(12, "bold")).pack(padx=12, pady=8)
 
         # Header — colonna Azioni aggiunta
         cols   = ["Nome allievo", "Corso", "Ore fatte", "Ore totali", "Progresso", "Azioni"]
@@ -115,7 +115,7 @@ class DashboardFrame(ctk.CTkFrame):
         hdr.pack(fill="x", pady=(0, 2))
         for col, w in zip(cols, widths):
             ctk.CTkLabel(hdr, text=col, width=w,
-                         font=ctk.CTkFont(size=11, weight="bold"),
+                         font=font(11, "bold"),
                          text_color="white", anchor="w").pack(side="left", padx=8, pady=7)
 
         if not rows:
@@ -136,13 +136,13 @@ class DashboardFrame(ctk.CTkFrame):
 
             course_disp = "Senza corso" if r["course_name"] == SYSTEM_COURSE else r["course_name"]
             ctk.CTkLabel(row_frame, text=r["name"], width=180, anchor="w",
-                         font=ctk.CTkFont(size=12)).pack(side="left", padx=8, pady=3)
+                         font=font(12)).pack(side="left", padx=8, pady=3)
             ctk.CTkLabel(row_frame, text=course_disp, width=160, anchor="w",
-                         font=ctk.CTkFont(size=11), text_color=GREY_TEXT).pack(side="left", padx=8)
+                         font=font(11), text_color=GREY_TEXT).pack(side="left", padx=8)
             ctk.CTkLabel(row_frame, text=f"{done:.1f} h", width=80, anchor="center",
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+                         font=font(11)).pack(side="left", padx=8)
             ctk.CTkLabel(row_frame, text=f"{total:.1f} h", width=80, anchor="center",
-                         font=ctk.CTkFont(size=11), text_color=GREY_TEXT).pack(side="left", padx=8)
+                         font=font(11), text_color=GREY_TEXT).pack(side="left", padx=8)
 
             # Barra progresso
             prog = ctk.CTkFrame(row_frame, fg_color="transparent", width=260)
@@ -153,7 +153,7 @@ class DashboardFrame(ctk.CTkFrame):
             bar.set(pct / 100)
             bar.pack(side="left", pady=3)
             ctk.CTkLabel(prog, text=f"{pct:.0f}%", width=44,
-                         font=ctk.CTkFont(size=11, weight="bold"),
+                         font=font(11, "bold"),
                          text_color=bar_color).pack(side="left", padx=4)
 
             # Colonna Azioni: pulsanti solo per allievi al 100%
@@ -171,20 +171,20 @@ class DashboardFrame(ctk.CTkFrame):
                 ctk.CTkButton(
                     actions, text="📜 Attestato", width=96, height=28,
                     fg_color="#8e44ad", hover_color="#6c3483",
-                    font=ctk.CTkFont(size=11),
+                    font=font(11),
                     command=lambda sid=sid, sname=sname, scourse=scourse, senroll=senroll, sdone=sdone, stotal=stotal:
                         self._generate_certificate(sname, scourse, senroll, sdone, stotal)
                 ).pack(side="left", padx=(0, 4))
                 ctk.CTkButton(
                     actions, text="Nuovo corso", width=88, height=28,
                     fg_color="#2980b9", hover_color="#1a6fa5",
-                    font=ctk.CTkFont(size=11),
+                    font=font(11),
                     command=lambda sid=sid, sname=sname: self._open_change_course(sid, sname)
                 ).pack(side="left", padx=(0, 4))
                 ctk.CTkButton(
                     actions, text="Elimina", width=66, height=28,
                     fg_color="#e74c3c", hover_color="#c0392b",
-                    font=ctk.CTkFont(size=11),
+                    font=font(11),
                     command=lambda sid=sid, sname=sname: self._confirm_delete(sid, sname)
                 ).pack(side="left")
 
@@ -202,6 +202,7 @@ class DashboardFrame(ctk.CTkFrame):
         if not output_path:
             return
         try:
+            from logic.pdf_generator import generate_certificate
             generate_certificate(output_path, name, course_name, enrollment_date, hours_done, total_hours)
             if messagebox.askyesno("Attestato generato", f"PDF salvato in:\n{output_path}\n\nAprire il file?"):
                 os.startfile(output_path)
@@ -226,7 +227,7 @@ class DashboardFrame(ctk.CTkFrame):
                      font=ctk.CTkFont(size=13, weight="bold"),
                      text_color=HEAD_COLOR).pack(pady=(20, 4))
         ctk.CTkLabel(dialog, text="Seleziona il nuovo corso:",
-                     font=ctk.CTkFont(size=11), text_color=GREY_TEXT).pack()
+                     font=font(11), text_color=GREY_TEXT).pack()
 
         course_map = {f"{c['name']} ({c['total_hours']:.0f}h)": c["id"] for c in courses}
         options = list(course_map.keys())
@@ -261,7 +262,7 @@ class DashboardFrame(ctk.CTkFrame):
                      text_color="#c0392b").pack(pady=(20, 6))
         ctk.CTkLabel(dialog,
                      text=f"Sei sicuro di voler eliminare '{student_name}'?\nTutte le presenze registrate andranno perse.",
-                     font=ctk.CTkFont(size=12), text_color=GREY_TEXT,
+                     font=font(12), text_color=GREY_TEXT,
                      justify="center").pack(pady=4)
 
         btns = ctk.CTkFrame(dialog, fg_color="transparent")
@@ -285,5 +286,5 @@ class DashboardFrame(ctk.CTkFrame):
         dialog.resizable(False, False)
         dialog.after(100, lambda d=dialog: _popup_focus(d))
         ctk.CTkLabel(dialog, text=msg, wraplength=300,
-                     font=ctk.CTkFont(size=12)).pack(pady=30)
+                     font=font(12)).pack(pady=30)
         ctk.CTkButton(dialog, text="OK", width=80, command=dialog.destroy).pack()

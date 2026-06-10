@@ -70,25 +70,33 @@ class App(ctk.CTk):
             btn.pack(fill="x", padx=10, pady=2)
             self._nav_buttons[label] = btn
 
-        # Area contenuto principale
+        # Area contenuto principale — i frame vengono creati al primo accesso
+        # (creazione lazy: avvio molto più rapido)
         self.content = ctk.CTkFrame(self, fg_color=MAIN_BG, corner_radius=0)
         self.content.pack(side="left", fill="both", expand=True)
 
-        for label, _, FrameClass in NAV_ITEMS:
-            frame = FrameClass(self.content, self)
+        self._frame_classes = {label: cls for label, _, cls in NAV_ITEMS}
+
+    def _get_frame(self, name):
+        frame = self._frames.get(name)
+        if frame is None:
+            frame = self._frame_classes[name](self.content, self)
             frame.place(relx=0, rely=0, relwidth=1, relheight=1)
-            self._frames[label] = frame
+            self._frames[name] = frame
+        return frame
 
     def _show_frame(self, name):
         for label, btn in self._nav_buttons.items():
             btn.configure(fg_color=SIDEBAR_SEL if label == name else "transparent")
 
-        frame = self._frames[name]
+        frame = self._get_frame(name)
         frame.tkraise()
         if hasattr(frame, "on_show"):
             frame.on_show()
 
     def refresh_frame(self, name):
-        frame = self._frames[name]
-        if hasattr(frame, "on_show"):
+        # Se il frame non è ancora stato creato non serve aggiornarlo:
+        # verrà popolato dal suo on_show alla prima apertura.
+        frame = self._frames.get(name)
+        if frame is not None and hasattr(frame, "on_show"):
             frame.on_show()
