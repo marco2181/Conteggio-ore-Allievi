@@ -1,11 +1,15 @@
 ; Script Inno Setup - Conteggio Ore Allievi
-; Per generare l'installer:
-;   1. Scaricare Inno Setup gratis da: https://jrsoftware.org/isinfo.php
-;   2. Aprire questo file con Inno Setup
-;   3. Premere F9 (Compile) — genera ConteggioOreAllievi_Setup.exe
+; Per generare l'installer: eseguire build_installer.bat
+; (oppure aprire questo file con Inno Setup e premere F9)
+;
+; L'installer usa la build --onedir (avvio più rapido della --onefile) e
+; installa PER UTENTE in %LOCALAPPDATA%\Programs: nessuna richiesta UAC e
+; la cartella è scrivibile, quindi il database in data\ accanto all'exe
+; funziona esattamente come nella versione portatile.
+; Alla disinstallazione la cartella data\ con il database NON viene toccata.
 
 #define AppName "Conteggio Ore Allievi"
-#define AppVersion "1.0"
+#define AppVersion "1.1"
 #define AppPublisher "Studio Formazione"
 #define AppExeName "ConteggioOreAllievi.exe"
 
@@ -14,30 +18,31 @@ AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
+; Installazione per-utente: niente UAC, cartella app scrivibile (serve per il DB)
+PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#AppName}
-DefaultGroupName={#AppName}
+DisableProgramGroupPage=yes
+OutputDir=dist
 OutputBaseFilename=ConteggioOreAllievi_Setup
+UninstallDisplayIcon={app}\{#AppExeName}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-; Il programma salva il DB nella sua cartella — servono permessi di scrittura
-; Se installato in Program Files su Windows 10/11 potrebbe servire UAC
-; Alternativa: installare in AppData dell'utente
-PrivilegesRequired=admin
 
 [Languages]
 Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Crea collegamento sul Desktop"; GroupDescription: "Icone aggiuntive:"; Flags: unchecked
+; Spuntato di default: collegamento sul Desktop
+Name: "desktopicon"; Description: "Crea collegamento sul Desktop"; GroupDescription: "Icone aggiuntive:"
 
 [Files]
-; L'exe generato da build.bat
-Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; La cartella generata da build_portable.bat (PyInstaller --onedir)
+; "Excludes: data\*" per non distribuire mai un database locale per errore
+Source: "dist\ConteggioOreAllievi\*"; DestDir: "{app}"; Excludes: "data\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
-Name: "{group}\Disinstalla {#AppName}"; Filename: "{uninstallexe}"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Run]
