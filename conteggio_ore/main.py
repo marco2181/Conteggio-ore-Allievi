@@ -30,21 +30,38 @@ def _setup_logging():
 def _backup_db():
     if not os.path.exists(DB_PATH):
         return
-    backup_dir = os.path.join(_DATA_DIR, "backups")
+    # Salta se il DB è vuoto (nessun allievo — installazione fresca)
+    try:
+        import sqlite3 as _sqlite3
+        with _sqlite3.connect(DB_PATH) as _c:
+            if _c.execute("SELECT COUNT(*) FROM students").fetchone()[0] == 0:
+                return
+    except Exception:
+        return
+    # Salva in Documenti: sopravvive a qualsiasi reinstallazione/aggiornamento
+    backup_dir = os.path.join(os.path.expanduser("~"), "Documents",
+                              "ConteggioOreAllievi", "backups")
     os.makedirs(backup_dir, exist_ok=True)
     today = date.today().strftime("%Y%m%d")
-    dest = os.path.join(backup_dir, f"conteggio_ore_{today}.db")
+    dest = os.path.join(backup_dir, f"auto_{today}.db")
     if not os.path.exists(dest):
-        shutil.copy2(DB_PATH, dest)
-        logging.info(f"Backup DB creato: {dest}")
-    # Mantieni solo gli ultimi 7 backup
-    backups = sorted(
-        [f for f in os.listdir(backup_dir) if f.endswith(".db")],
-        reverse=True,
-    )
-    for old in backups[7:]:
-        os.remove(os.path.join(backup_dir, old))
-        logging.info(f"Backup vecchio rimosso: {old}")
+        try:
+            shutil.copy2(DB_PATH, dest)
+            logging.info(f"Backup automatico creato: {dest}")
+        except Exception as e:
+            logging.warning(f"Backup automatico fallito: {e}")
+            return
+    # Mantieni solo gli ultimi 7 backup automatici
+    try:
+        backups = sorted(
+            [f for f in os.listdir(backup_dir) if f.startswith("auto_") and f.endswith(".db")],
+            reverse=True,
+        )
+        for old in backups[7:]:
+            os.remove(os.path.join(backup_dir, old))
+            logging.info(f"Backup vecchio rimosso: {old}")
+    except Exception:
+        pass
 
 
 def main():
