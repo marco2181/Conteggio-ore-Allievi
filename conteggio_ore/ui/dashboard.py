@@ -136,7 +136,7 @@ class DashboardFrame(ctk.CTkFrame):
 
             course_disp = "Senza corso" if r["course_name"] == SYSTEM_COURSE else r["course_name"]
             ctk.CTkLabel(row_frame, text=r["name"], width=180, anchor="w",
-                         font=ctk.CTkFont(size=12)).pack(side="left", padx=8, pady=6)
+                         font=ctk.CTkFont(size=12)).pack(side="left", padx=8, pady=3)
             ctk.CTkLabel(row_frame, text=course_disp, width=160, anchor="w",
                          font=ctk.CTkFont(size=11), text_color=GREY_TEXT).pack(side="left", padx=8)
             ctk.CTkLabel(row_frame, text=f"{done:.1f} h", width=80, anchor="center",
@@ -151,7 +151,7 @@ class DashboardFrame(ctk.CTkFrame):
             bar = ctk.CTkProgressBar(prog, width=180, height=14,
                                      progress_color=bar_color, fg_color="#dfe6e9")
             bar.set(pct / 100)
-            bar.pack(side="left", pady=6)
+            bar.pack(side="left", pady=3)
             ctk.CTkLabel(prog, text=f"{pct:.0f}%", width=44,
                          font=ctk.CTkFont(size=11, weight="bold"),
                          text_color=bar_color).pack(side="left", padx=4)
