@@ -1,8 +1,11 @@
+import shutil
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
+from datetime import date as _date
 import customtkinter as ctk
 
 from database.models import get_all_sessions, add_session, update_session, delete_session
+from database.db import DB_PATH
 from logic.sessions import day_name, slot_label, GIORNI
 
 MAIN_BG    = "#f5f6fa"
@@ -37,6 +40,21 @@ class SettingsFrame(ctk.CTkFrame):
                      text_color=HEAD_COLOR).pack(side="left")
         ctk.CTkButton(top, text="+ Aggiungi turno", width=140,
                       command=self._open_add_dialog).pack(side="right")
+
+        # Backup / Restore database
+        backup_bar = ctk.CTkFrame(self, fg_color=MAIN_BG)
+        backup_bar.pack(fill="x", padx=24, pady=(10, 0))
+        ctk.CTkLabel(backup_bar, text="Database:",
+                     text_color=HEAD_COLOR,
+                     font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(backup_bar, text="📦 Esporta backup", width=150,
+                      fg_color="#27ae60", hover_color="#1e8449",
+                      font=ctk.CTkFont(size=12),
+                      command=self._backup_db).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(backup_bar, text="📥 Importa backup", width=150,
+                      fg_color="#e67e22", hover_color="#ca6f1e",
+                      font=ctk.CTkFont(size=12),
+                      command=self._restore_db).pack(side="left")
 
         self.scroll = ctk.CTkScrollableFrame(self, fg_color=MAIN_BG)
         self.scroll.pack(fill="both", expand=True, padx=24, pady=(14, 16))
@@ -83,6 +101,44 @@ class SettingsFrame(ctk.CTkFrame):
                           font=ctk.CTkFont(size=11),
                           fg_color="#e74c3c", hover_color="#c0392b",
                           command=lambda s_=s: self._delete(s_)).pack(side="left", padx=2)
+
+    def _backup_db(self):
+        dest = filedialog.asksaveasfilename(
+            defaultextension=".db",
+            filetypes=[("Database SQLite", "*.db"), ("Tutti i file", "*.*")],
+            initialfile=f"backup_{_date.today().strftime('%Y%m%d')}.db",
+            title="Salva backup database"
+        )
+        if dest:
+            try:
+                shutil.copy2(DB_PATH, dest)
+                messagebox.showinfo("Backup completato",
+                                    f"Database salvato in:\n{dest}\n\n"
+                                    "Conserva questo file per ripristinare tutti i dati "
+                                    "(allievi, presenze, corsi, turni).")
+            except Exception as e:
+                messagebox.showerror("Errore backup", str(e))
+
+    def _restore_db(self):
+        src = filedialog.askopenfilename(
+            filetypes=[("Database SQLite", "*.db"), ("Tutti i file", "*.*")],
+            title="Seleziona file di backup da ripristinare"
+        )
+        if not src:
+            return
+        if messagebox.askyesno(
+            "Conferma ripristino",
+            "Ripristinare il database dal backup selezionato?\n\n"
+            "⚠️ I dati attuali verranno SOSTITUITI con quelli del backup.\n"
+            "L'app andrà riavviata dopo il ripristino."
+        ):
+            try:
+                shutil.copy2(src, DB_PATH)
+                messagebox.showinfo("Ripristino completato",
+                                    "Database ripristinato correttamente.\n\n"
+                                    "Chiudi e riapri l'applicazione per applicare le modifiche.")
+            except Exception as e:
+                messagebox.showerror("Errore ripristino", str(e))
 
     def _open_add_dialog(self):
         SessionDialog(self, None, self._refresh)

@@ -36,6 +36,20 @@ class AttendanceFrame(ctk.CTkFrame):
 
         date_frame = ctk.CTkFrame(top, fg_color=MAIN_BG)
         date_frame.pack(side="right")
+
+        # Barra di ricerca allievo
+        search_bar = ctk.CTkFrame(self, fg_color=MAIN_BG)
+        search_bar.pack(fill="x", padx=24, pady=(8, 0))
+        ctk.CTkLabel(search_bar, text="Cerca allievo:",
+                     text_color=HEAD_COLOR,
+                     font=ctk.CTkFont(size=12)).pack(side="left", padx=(0, 8))
+        self._search_var = tk.StringVar()
+        ctk.CTkEntry(search_bar, textvariable=self._search_var,
+                     width=240, placeholder_text="Nome...").pack(side="left")
+        ctk.CTkButton(search_bar, text="✕", width=28, height=28,
+                      fg_color="#bdc3c7", hover_color="#95a5a6", text_color="#2c3e50",
+                      command=lambda: self._search_var.set("")).pack(side="left", padx=(4, 0))
+        self._search_var.trace_add("write", lambda *_: self.after(350, self._load_day))
         ctk.CTkLabel(date_frame, text="Data:", text_color=HEAD_COLOR,
                      font=ctk.CTkFont(size=13)).pack(side="left", padx=(0, 6))
         self.date_picker = DateEntry(
@@ -79,6 +93,9 @@ class AttendanceFrame(ctk.CTkFrame):
         day_idx = self._selected_date.weekday()  # 0=Mon..5=Sat
         sessions = get_sessions_for_day(day_idx)
         students = get_all_students(active_only=True)
+        query = self._search_var.get().strip().lower()
+        if query:
+            students = [s for s in students if query in s["name"].lower()]
         date_str = self._selected_date.strftime("%Y-%m-%d")
 
         if not sessions:
@@ -190,7 +207,6 @@ class AttendanceFrame(ctk.CTkFrame):
 
         self.app.refresh_frame("Dashboard")
         self._check_threshold(snapshot_before)
-        self._load_day()
 
     def _check_threshold(self, snapshot_before):
         """Mostra popup se un allievo ha appena superato l'80% delle ore."""
