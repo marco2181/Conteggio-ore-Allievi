@@ -2,7 +2,7 @@ import csv
 import os
 import tkinter as tk
 from tkinter import messagebox, filedialog
-from datetime import date
+from datetime import date, datetime
 import customtkinter as ctk
 from tkcalendar import DateEntry
 
@@ -196,13 +196,14 @@ class StudentsFrame(ctk.CTkFrame):
         try:
             with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
                 writer = csv.writer(f)
-                writer.writerow(["Nome", "Corso", "Ore fatte", "Ore totali", "% Completamento", "Iscrizione"])
+                writer.writerow(["Nome", "Corso", "Ore fatte", "Ore totali", "% Completamento", "Iscrizione", "Ore personalizzate"])
                 for s in students:
                     total = s["total_hours"]
                     done = get_student_total_hours(s["id"])
                     pct = min((done / total * 100) if total > 0 else 0, 100)
                     course_disp = "Senza corso" if s["course_name"] == SYSTEM_COURSE else s["course_name"]
-                    writer.writerow([s["name"], course_disp, f"{done:.1f}", f"{total:.1f}", f"{pct:.0f}%", s["enrollment_date"]])
+                    custom = f"{s['custom_hours']:.1f}" if s["custom_hours"] is not None else ""
+                    writer.writerow([s["name"], course_disp, f"{done:.1f}", f"{total:.1f}", f"{pct:.0f}%", s["enrollment_date"], custom])
             messagebox.showinfo("Export CSV", f"File salvato:\n{output_path}")
         except Exception as e:
             messagebox.showerror("Errore export", str(e))
@@ -224,9 +225,13 @@ class StudentsFrame(ctk.CTkFrame):
                     name = (row.get("Nome") or "").strip()
                     corso = (row.get("Corso") or "").strip()
                     ore_str = (row.get("Ore personalizzate") or "").strip()
+                    enroll_str = (row.get("Iscrizione") or "").strip()
                     if not name:
                         continue
-                    course_id = course_map.get(corso.lower())
+                    if corso.lower() in ("senza corso", ""):
+                        course_id = get_system_course_id()
+                    else:
+                        course_id = course_map.get(corso.lower())
                     if not course_id:
                         skipped.append(f"{name} (corso '{corso}' non trovato)")
                         continue
@@ -236,8 +241,15 @@ class StudentsFrame(ctk.CTkFrame):
                             custom_hours = float(ore_str.replace(",", "."))
                         except ValueError:
                             pass
+                    enrollment_date = date.today().strftime("%Y-%m-%d")
+                    if enroll_str:
+                        try:
+                            datetime.strptime(enroll_str, "%Y-%m-%d")
+                            enrollment_date = enroll_str
+                        except ValueError:
+                            pass
                     try:
-                        add_student(name, course_id, date.today().strftime("%Y-%m-%d"), custom_hours)
+                        add_student(name, course_id, enrollment_date, custom_hours)
                         added += 1
                     except ValueError as e:
                         skipped.append(f"{name} ({e})")
