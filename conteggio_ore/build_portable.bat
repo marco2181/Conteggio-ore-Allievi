@@ -5,11 +5,24 @@ echo ============================================
 
 cd /d "%~dp0"
 
+where python >nul 2>&1
+if errorlevel 1 (
+    echo ERRORE: Python non trovato nel PATH.
+    echo Reinstalla Python da https://www.python.org e spunta "Add python.exe to PATH".
+    pause
+    exit /b 1
+)
+
 echo [1/4] Installazione dipendenze...
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERRORE: installazione dipendenze fallita.
+    pause
+    exit /b 1
+)
 
 echo [2/4] Creazione cartella portatile...
-pyinstaller --onedir ^
+python -m PyInstaller --onedir ^
     --windowed ^
     --name "ConteggioOreAllievi" ^
     --hidden-import "babel.numbers" ^

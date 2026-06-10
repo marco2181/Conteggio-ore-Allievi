@@ -9,6 +9,14 @@ from database.models import (
 from logic.sessions import progress_color
 from logic.pdf_generator import generate_certificate
 
+
+def _popup_focus(win):
+    win.attributes("-topmost", True)
+    win.lift()
+    win.focus_force()
+    win.grab_set()
+    win.after(200, lambda: win.attributes("-topmost", False))
+
 MAIN_BG    = "#f5f6fa"
 CARD_BG    = "#ffffff"
 HEAD_COLOR = "#2c3e50"
@@ -212,8 +220,7 @@ class DashboardFrame(ctk.CTkFrame):
         dialog.title("Assegna nuovo corso")
         dialog.geometry("380x240")
         dialog.resizable(False, False)
-        dialog.grab_set()
-        dialog.lift()
+        dialog.after(100, lambda d=dialog: _popup_focus(d))
 
         ctk.CTkLabel(dialog, text=f"Allievo: {student_name}",
                      font=ctk.CTkFont(size=13, weight="bold"),
@@ -247,8 +254,7 @@ class DashboardFrame(ctk.CTkFrame):
         dialog.title("Elimina allievo")
         dialog.geometry("400x200")
         dialog.resizable(False, False)
-        dialog.grab_set()
-        dialog.lift()
+        dialog.after(100, lambda d=dialog: _popup_focus(d))
 
         ctk.CTkLabel(dialog, text="⚠️  Eliminazione definitiva",
                      font=ctk.CTkFont(size=14, weight="bold"),
@@ -277,8 +283,7 @@ class DashboardFrame(ctk.CTkFrame):
         dialog.title("Attenzione")
         dialog.geometry("340x130")
         dialog.resizable(False, False)
-        dialog.grab_set()
-        dialog.lift()
+        dialog.after(100, lambda d=dialog: _popup_focus(d))
         ctk.CTkLabel(dialog, text=msg, wraplength=300,
                      font=ctk.CTkFont(size=12)).pack(pady=30)
         ctk.CTkButton(dialog, text="OK", width=80, command=dialog.destroy).pack()

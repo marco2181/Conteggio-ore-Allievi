@@ -17,6 +17,14 @@ from logic.pdf_generator import generate_certificate
 SENZA_CORSO_LABEL = "— Senza corso (ore individuali) —"
 from logic.sessions import day_name, slot_label, progress_color
 
+
+def _popup_focus(win):
+    win.attributes("-topmost", True)
+    win.lift()
+    win.focus_force()
+    win.grab_set()
+    win.after(200, lambda: win.attributes("-topmost", False))
+
 MAIN_BG    = "#f5f6fa"
 CARD_BG    = "#ffffff"
 HEAD_COLOR = "#2c3e50"
@@ -282,7 +290,7 @@ class StudentDialog(ctk.CTkToplevel):
         self.on_save = on_save
         self.title("Nuovo allievo" if student is None else "Modifica allievo")
         self.geometry("460x460")
-        self.after(100, self.grab_set)
+        self.after(100, lambda: _popup_focus(self))
         self._build()
 
     def _build(self):
@@ -470,7 +478,7 @@ class HistoryDialog(ctk.CTkToplevel):
         self.student = student
         self.title(f"Storico presenze — {student['name']}")
         self.geometry("620x500")
-        self.after(100, self.grab_set)
+        self.after(100, lambda: _popup_focus(self))
         self._build()
 
     def _build(self):

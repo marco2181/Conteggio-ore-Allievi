@@ -12,6 +12,14 @@ GREY_TEXT  = "#7f8c8d"
 PRESET_HOURS = [20, 90, 150, 300]
 
 
+def _popup_focus(win):
+    win.attributes("-topmost", True)
+    win.lift()
+    win.focus_force()
+    win.grab_set()
+    win.after(200, lambda: win.attributes("-topmost", False))
+
+
 class CoursesFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
@@ -137,7 +145,7 @@ class CourseDialog(ctk.CTkToplevel):
         self.on_save = on_save
         self.title("Nuovo corso" if course is None else "Modifica corso")
         self.geometry("400x340")
-        self.after(100, self.grab_set)
+        self.after(100, lambda: _popup_focus(self))
         self._build()
 
     def _build(self):

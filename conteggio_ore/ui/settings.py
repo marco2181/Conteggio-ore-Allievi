@@ -11,6 +11,14 @@ HEAD_COLOR = "#2c3e50"
 GREY_TEXT  = "#7f8c8d"
 
 SLOT_LABELS  = ["mattina", "pomeriggio", "sera"]
+
+
+def _popup_focus(win):
+    win.attributes("-topmost", True)
+    win.lift()
+    win.focus_force()
+    win.grab_set()
+    win.after(200, lambda: win.attributes("-topmost", False))
 DAY_OPTIONS  = GIORNI[:6]                             # Lun–Sab
 SLOT_OPTIONS = [slot_label(s) for s in SLOT_LABELS]
 
@@ -101,7 +109,7 @@ class SessionDialog(ctk.CTkToplevel):
         self.title("Nuovo turno" if session is None else "Modifica turno")
         self.geometry("380x280")
         self.resizable(False, False)
-        self.after(100, self.grab_set)
+        self.after(100, lambda: _popup_focus(self))
         self._build()
 
     def _build(self):
