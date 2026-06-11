@@ -21,3 +21,7 @@ venv/
 # Windows
 Thumbs.db
 desktop.ini
+
+# Collegamenti locali (contengono percorsi assoluti del PC,
+# si rigenerano con crea_collegamenti.ps1)
+*.lnk
