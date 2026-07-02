@@ -15,6 +15,11 @@ from database.models import SYSTEM_COURSE
 def _course_label(name):
     return "Senza corso" if name == SYSTEM_COURSE else name
 
+
+def _remaining_hours(done, total):
+    """Ore mancanti alla conclusione del corso (mai negativo)."""
+    return max(total - done, 0) if total > 0 else 0
+
 HEADER_COLOR = colors.HexColor("#2c3e50")
 ROW_ALT_COLOR = colors.HexColor("#ecf0f1")
 ACCENT_GREEN = colors.HexColor("#27ae60")
@@ -69,10 +74,13 @@ def generate_individual_report(output_path, student, rows, date_from, date_to):
     hours_done = student["hours_done"]
     total = student["total_hours"]
     pct = min((hours_done / total * 100) if total > 0 else 0, 100)
+    remaining = _remaining_hours(hours_done, total)
+    remaining_label = "Corso completato" if (total > 0 and remaining == 0) else f"{remaining:.1f} h"
     info_data = [
         ["Corso:", _course_label(student["course_name"])],
         ["Monte ore corso:", f"{total:.1f} h"],
         ["Ore frequentate:", f"{hours_done:.1f} h"],
+        ["Ore rimanenti:", remaining_label],
         ["Completamento:", f"{pct:.1f}%"],
         ["Periodo:", f"{date_from} → {date_to}"],
     ]
@@ -156,7 +164,7 @@ def generate_monthly_report(output_path, rows, year, month):
     story.append(HRFlowable(width="100%", thickness=1, color=HEADER_COLOR))
     story.append(Spacer(1, 0.5*cm))
 
-    header = ["Allievo", "Corso", "Ore del mese", "Ore totali", "Monte ore", "Completamento"]
+    header = ["Allievo", "Corso", "Ore mese", "Ore totali", "Monte ore", "Ore rimanenti", "Compl."]
     table_data = [header]
 
     for r in rows:
@@ -169,10 +177,11 @@ def generate_monthly_report(output_path, rows, year, month):
             f"{r['hours_month']:.1f}",
             f"{done:.1f}",
             f"{total:.1f}",
+            f"{_remaining_hours(done, total):.1f}",
             f"{pct:.1f}%",
         ])
 
-    col_widths = [4.5*cm, 4.0*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.5*cm]
+    col_widths = [3.6*cm, 3.0*cm, 1.8*cm, 1.8*cm, 1.8*cm, 2.5*cm, 2.5*cm]
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     n = len(table_data)
 
@@ -197,8 +206,8 @@ def generate_monthly_report(output_path, rows, year, month):
         done = r["hours_total"]
         pct = min((done / total * 100) if total > 0 else 0, 100)
         c = _progress_color(pct)
-        row_styles.append(("TEXTCOLOR", (5, i), (5, i), c))
-        row_styles.append(("FONTNAME", (5, i), (5, i), "Helvetica-Bold"))
+        row_styles.append(("TEXTCOLOR", (6, i), (6, i), c))
+        row_styles.append(("FONTNAME", (6, i), (6, i), "Helvetica-Bold"))
 
     t.setStyle(TableStyle(row_styles))
     story.append(t)
@@ -228,15 +237,16 @@ def generate_course_report(output_path, course_name, rows):
     story.append(HRFlowable(width="100%", thickness=1, color=HEADER_COLOR))
     story.append(Spacer(1, 0.5*cm))
 
-    header = ["Allievo", "Iscrizione", "Ore fatte", "Monte ore", "Completamento"]
+    header = ["Allievo", "Iscrizione", "Ore fatte", "Monte ore", "Ore rimanenti", "Completamento"]
     table_data = [header]
     for r in rows:
         total = r["total_hours"]
         done = r["hours_done"]
         pct = min((done / total * 100) if total > 0 else 0, 100)
-        table_data.append([r["name"], r["enrollment_date"], f"{done:.1f}", f"{total:.1f}", f"{pct:.1f}%"])
+        table_data.append([r["name"], r["enrollment_date"], f"{done:.1f}", f"{total:.1f}",
+                           f"{_remaining_hours(done, total):.1f}", f"{pct:.1f}%"])
 
-    col_widths = [5.5*cm, 3.0*cm, 2.5*cm, 2.5*cm, 4.0*cm]
+    col_widths = [4.6*cm, 2.8*cm, 2.2*cm, 2.2*cm, 2.6*cm, 2.6*cm]
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     n = len(table_data)
 
@@ -259,8 +269,8 @@ def generate_course_report(output_path, course_name, rows):
         done = r["hours_done"]
         pct = min((done / total * 100) if total > 0 else 0, 100)
         c = _progress_color(pct)
-        row_styles.append(("TEXTCOLOR", (4, i), (4, i), c))
-        row_styles.append(("FONTNAME", (4, i), (4, i), "Helvetica-Bold"))
+        row_styles.append(("TEXTCOLOR", (5, i), (5, i), c))
+        row_styles.append(("FONTNAME", (5, i), (5, i), "Helvetica-Bold"))
 
     t.setStyle(TableStyle(row_styles))
     story.append(t)

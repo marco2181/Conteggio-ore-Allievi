@@ -204,14 +204,17 @@ Se un allievo iscritto a un corso formale ha un monte ore diverso dal default de
 ## Formato dei PDF
 
 ### Scheda individuale
-- Intestazione: nome allievo, corso, ore totali/frequentate, % completamento, periodo
+- Intestazione: nome allievo, corso, ore totali/frequentate, **ore rimanenti** (o "Corso completato"), % completamento, periodo
 - Tabella: Data | Giorno | Turno | Ore frequentate | Note
 - Riga totale in fondo
 
 ### Registro mensile
 - Intestazione: mese/anno
-- Tabella: Nome allievo | Corso | Ore del mese | Ore totali | Monte ore | Completamento
-- La colonna "Completamento" è colorata (verde/arancio/rosso)
+- Tabella: Nome allievo | Corso | Ore mese | Ore totali | Monte ore | **Ore rimanenti** | Compl.
+- La colonna "Compl." è colorata (verde/arancio/rosso)
+
+### Report per corso
+- Tabella: Allievo | Iscrizione | Ore fatte | Monte ore | **Ore rimanenti** | Completamento
 
 ---
 
@@ -347,6 +350,7 @@ pyinstaller>=6.0.0
 | 02/07/2026 | Perf: versione dati globale — le schermate si ricostruiscono solo se il DB è cambiato dall'ultimo render |
 | 02/07/2026 | Presenze: messaggio errore ore non valide mostra il nome allievo (non più l'id interno) |
 | 02/07/2026 | Test suite estesa a 17 test (backup automatico + ripristino) — installer v1.2 |
+| 02/07/2026 | Report PDF: ore rimanenti al completamento in scheda individuale, registro mensile e report per corso |
 
 ---
 
