@@ -10,6 +10,7 @@ from database.models import (
     get_student_attendance_in_period, get_monthly_report_data,
     get_all_courses, get_students_summary
 )
+from database.db import get_data_version
 from logic.sessions import MESI
 
 MAIN_BG    = "#f5f6fa"
@@ -22,6 +23,7 @@ class ReportsFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
         self.app = app
+        self._rendered_version = None
         self._build()
 
     def _build(self):
@@ -115,6 +117,11 @@ class ReportsFrame(ctk.CTkFrame):
                       command=self._generate_course).pack(side="left")
 
     def on_show(self):
+        # Aggiorna i menu a tendina solo se il DB è cambiato dall'ultimo render
+        version = get_data_version()
+        if version == self._rendered_version:
+            return
+        self._rendered_version = version
         students = get_all_students(active_only=True)
         self._student_map = {s["name"]: s["id"] for s in students}
         names = list(self._student_map.keys())

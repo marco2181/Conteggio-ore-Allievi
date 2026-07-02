@@ -1,11 +1,10 @@
-import shutil
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from datetime import date as _date
 import customtkinter as ctk
 
 from database.models import get_all_sessions, add_session, update_session, delete_session
-from database.db import DB_PATH
+from database.db import export_database, restore_database, get_data_version
 from logic.sessions import day_name, slot_label, GIORNI
 
 MAIN_BG    = "#f5f6fa"
@@ -30,6 +29,7 @@ class SettingsFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
         self.app = app
+        self._rendered_version = None
         self._build()
 
     def _build(self):
@@ -55,14 +55,21 @@ class SettingsFrame(ctk.CTkFrame):
                       fg_color="#e67e22", hover_color="#ca6f1e",
                       font=ctk.CTkFont(size=12),
                       command=self._restore_db).pack(side="left")
+        ctk.CTkLabel(backup_bar,
+                     text="Backup automatico ad ogni salvataggio in Documenti\\ConteggioOreAllievi\\backups",
+                     text_color=GREY_TEXT,
+                     font=ctk.CTkFont(size=11)).pack(side="left", padx=(12, 0))
 
         self.scroll = ctk.CTkScrollableFrame(self, fg_color=MAIN_BG)
         self.scroll.pack(fill="both", expand=True, padx=24, pady=(14, 16))
 
     def on_show(self):
-        self._refresh()
+        # Ricostruisce la tabella solo se il DB è cambiato dall'ultimo render
+        if get_data_version() != self._rendered_version:
+            self._refresh()
 
     def _refresh(self):
+        self._rendered_version = get_data_version()
         for w in self.scroll.winfo_children():
             w.destroy()
 
@@ -111,7 +118,7 @@ class SettingsFrame(ctk.CTkFrame):
         )
         if dest:
             try:
-                shutil.copy2(DB_PATH, dest)
+                export_database(dest)
                 messagebox.showinfo("Backup completato",
                                     f"Database salvato in:\n{dest}\n\n"
                                     "Conserva questo file per ripristinare tutti i dati "
@@ -133,7 +140,7 @@ class SettingsFrame(ctk.CTkFrame):
             "L'app andrà riavviata dopo il ripristino."
         ):
             try:
-                shutil.copy2(src, DB_PATH)
+                restore_database(src)
                 messagebox.showinfo("Ripristino completato",
                                     "Database ripristinato correttamente.\n\n"
                                     "Chiudi e riapri l'applicazione per applicare le modifiche.")

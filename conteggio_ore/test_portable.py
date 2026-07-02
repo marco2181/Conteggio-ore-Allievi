@@ -16,6 +16,9 @@ db_path = os.path.join(_tmp_dir, "data", "conteggio_ore.db")
 sys.path.insert(0, BASE_DIR)
 import database.db as dbmod
 dbmod.DB_PATH = db_path
+# Anche i backup automatici vanno nella cartella temporanea:
+# altrimenti i test sovrascriverebbero i backup reali in Documenti
+dbmod.BACKUP_DIR = os.path.join(_tmp_dir, "backups")
 
 from database import models as m
 from database.db import init_db
@@ -218,11 +221,43 @@ try:
 except Exception as e:
     fail(14, str(e))
 
-# 15. Build portatile presente e completa (solo verifica, nessuna scrittura)
+# 15. Backup automatico dopo ogni salvataggio
+try:
+    import sqlite3 as _sq
+    backup_file = os.path.join(dbmod.BACKUP_DIR, 'ultimo_salvataggio.db')
+    if os.path.exists(backup_file):
+        os.remove(backup_file)
+    anna = next(s for s in m.get_all_students(active_only=True) if 'Anna' in s['name'])
+    m.save_attendance_batch([(anna['id'], sess['id'], '2026-06-08', 3.0, '')], [])
+    assert os.path.exists(backup_file), 'backup non creato dopo il salvataggio'
+    # Il backup deve contenere la presenza appena salvata (WAL incluso)
+    bconn = _sq.connect(backup_file)
+    try:
+        found = bconn.execute(
+            "SELECT COUNT(*) FROM attendance WHERE date='2026-06-08'"
+        ).fetchone()[0]
+    finally:
+        bconn.close()
+    assert found == 1, 'il backup non contiene l\'ultimo salvataggio'
+    ok(15, 'Backup automatico ad ogni salvataggio (ultimo_salvataggio.db) OK')
+except Exception as e:
+    fail(15, str(e))
+
+# 16. Ripristino da backup (WAL-safe)
+try:
+    before = m.get_attendance_totals()
+    dbmod.restore_database(backup_file)
+    after = m.get_attendance_totals()
+    assert before == after, 'i dati dopo il ripristino non coincidono con il backup'
+    ok(16, 'Ripristino database da backup OK')
+except Exception as e:
+    fail(16, str(e))
+
+# 17. Build portatile presente e completa (solo verifica, nessuna scrittura)
 try:
     exe = os.path.join(DIST_DIR, 'ConteggioOreAllievi.exe')
     if not os.path.exists(exe):
-        ok(15, 'Build portatile non presente (eseguire build_portable.bat) — saltato')
+        ok(17, 'Build portatile non presente (eseguire build_portable.bat) — saltato')
     else:
         internal = os.path.join(DIST_DIR, '_internal')
         for needed in ('customtkinter', 'babel'):
@@ -230,9 +265,9 @@ try:
         stray_db = os.path.join(DIST_DIR, 'data', 'conteggio_ore.db')
         if os.path.exists(stray_db):
             print(f'  [WARN] dist/ contiene un database ({stray_db}): non distribuirlo se sono dati di test')
-        ok(15, 'Build portatile: exe + asset customtkinter/babel presenti')
+        ok(17, 'Build portatile: exe + asset customtkinter/babel presenti')
 except Exception as e:
-    fail(15, str(e))
+    fail(17, str(e))
 
 # Pulizia DB temporaneo
 shutil.rmtree(_tmp_dir, ignore_errors=True)

@@ -1,7 +1,19 @@
+import functools
 import sqlite3
-from .db import get_connection
+from .db import get_connection, mark_db_written
 
 SYSTEM_COURSE = "__LIBERO__"
+
+
+def _write_op(fn):
+    """Dopo ogni scrittura riuscita: aggiorna la versione dati (le schermate
+    sanno che devono ricaricarsi) e crea il backup automatico del database."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        result = fn(*args, **kwargs)
+        mark_db_written()
+        return result
+    return wrapper
 
 
 # ─── CORSI ────────────────────────────────────────────────────────────────────
@@ -25,6 +37,7 @@ def get_course(course_id):
     with get_connection() as conn:
         return conn.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
 
+@_write_op
 def add_course(name, total_hours):
     try:
         with get_connection() as conn:
@@ -33,6 +46,7 @@ def add_course(name, total_hours):
     except sqlite3.IntegrityError:
         raise ValueError(f"Esiste già un corso con il nome «{name}».")
 
+@_write_op
 def update_course(course_id, name, total_hours):
     try:
         with get_connection() as conn:
@@ -41,16 +55,19 @@ def update_course(course_id, name, total_hours):
     except sqlite3.IntegrityError:
         raise ValueError(f"Esiste già un corso con il nome «{name}».")
 
+@_write_op
 def archive_course(course_id):
     with get_connection() as conn:
         conn.execute("UPDATE courses SET active=0 WHERE id=?", (course_id,))
         conn.commit()
 
+@_write_op
 def restore_course(course_id):
     with get_connection() as conn:
         conn.execute("UPDATE courses SET active=1 WHERE id=?", (course_id,))
         conn.commit()
 
+@_write_op
 def delete_course(course_id):
     with get_connection() as conn:
         course = conn.execute("SELECT name FROM courses WHERE id=?", (course_id,)).fetchone()
@@ -92,6 +109,7 @@ def get_student(student_id):
             WHERE s.id=?
         """, (student_id,)).fetchone()
 
+@_write_op
 def add_student(name, course_id, enrollment_date, custom_hours=None):
     try:
         with get_connection() as conn:
@@ -103,6 +121,7 @@ def add_student(name, course_id, enrollment_date, custom_hours=None):
     except sqlite3.IntegrityError as e:
         raise ValueError(f"Impossibile aggiungere l'allievo: {e}")
 
+@_write_op
 def update_student(student_id, name, course_id, enrollment_date, custom_hours=None):
     try:
         with get_connection() as conn:
@@ -114,21 +133,25 @@ def update_student(student_id, name, course_id, enrollment_date, custom_hours=No
     except sqlite3.IntegrityError as e:
         raise ValueError(f"Impossibile aggiornare l'allievo: {e}")
 
+@_write_op
 def archive_student(student_id):
     with get_connection() as conn:
         conn.execute("UPDATE students SET active=0 WHERE id=?", (student_id,))
         conn.commit()
 
+@_write_op
 def restore_student(student_id):
     with get_connection() as conn:
         conn.execute("UPDATE students SET active=1 WHERE id=?", (student_id,))
         conn.commit()
 
+@_write_op
 def change_student_course(student_id, new_course_id):
     with get_connection() as conn:
         conn.execute("UPDATE students SET course_id=? WHERE id=?", (new_course_id, student_id))
         conn.commit()
 
+@_write_op
 def delete_student_permanently(student_id):
     with get_connection() as conn:
         conn.execute("DELETE FROM attendance WHERE student_id=?", (student_id,))
@@ -165,6 +188,7 @@ def get_attendance_for_date_session(date, session_id):
             WHERE a.date=? AND a.session_id=?
         """, (date, session_id)).fetchall()
 
+@_write_op
 def upsert_attendance(student_id, session_id, date, hours_attended, notes=""):
     with get_connection() as conn:
         conn.execute("""
@@ -175,6 +199,7 @@ def upsert_attendance(student_id, session_id, date, hours_attended, notes=""):
         """, (student_id, session_id, date, hours_attended, notes))
         conn.commit()
 
+@_write_op
 def delete_attendance(student_id, session_id, date):
     with get_connection() as conn:
         conn.execute(
@@ -199,6 +224,7 @@ def get_attendance_totals():
         ).fetchall()
         return {r["student_id"]: r["total"] for r in rows}
 
+@_write_op
 def save_attendance_batch(saves, deletes):
     """Salva/elimina presenze in un'unica transazione.
 
@@ -268,6 +294,7 @@ def get_monthly_report_data(year, month):
             ORDER BY s.name
         """, (month_str + "%",)).fetchall()
 
+@_write_op
 def add_session(day_of_week, slot, default_hours):
     with get_connection() as conn:
         conn.execute(
@@ -276,6 +303,7 @@ def add_session(day_of_week, slot, default_hours):
         )
         conn.commit()
 
+@_write_op
 def update_session(session_id, day_of_week, slot, default_hours):
     with get_connection() as conn:
         conn.execute(
@@ -284,6 +312,7 @@ def update_session(session_id, day_of_week, slot, default_hours):
         )
         conn.commit()
 
+@_write_op
 def delete_session(session_id):
     with get_connection() as conn:
         linked = conn.execute(

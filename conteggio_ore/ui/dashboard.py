@@ -6,6 +6,7 @@ from database.models import (
     get_students_summary, get_all_courses,
     change_student_course, delete_student_permanently, SYSTEM_COURSE
 )
+from database.db import get_data_version
 from logic.sessions import progress_color
 from ui.style import font
 
@@ -28,6 +29,7 @@ class DashboardFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
         self.app = app
         self._course_filter_map = {}  # label → course_id (None per "Tutti")
+        self._rendered_version = None  # versione dati dell'ultimo render
         self._build()
 
     def _build(self):
@@ -36,7 +38,7 @@ class DashboardFrame(ctk.CTkFrame):
         ctk.CTkLabel(header, text="Dashboard", font=ctk.CTkFont(size=22, weight="bold"),
                      text_color=HEAD_COLOR).pack(side="left")
         ctk.CTkButton(header, text="↻  Aggiorna", width=110,
-                      command=self.on_show).pack(side="right")
+                      command=lambda: self.on_show(force=True)).pack(side="right")
 
         ctk.CTkLabel(header, text="Corso:", text_color=HEAD_COLOR,
                      font=font(12)).pack(side="right", padx=(0, 6))
@@ -53,10 +55,17 @@ class DashboardFrame(ctk.CTkFrame):
         self.table_frame = ctk.CTkScrollableFrame(self, fg_color=MAIN_BG, label_text="")
         self.table_frame.pack(fill="both", expand=True, padx=24, pady=(12, 16))
 
-    def on_show(self):
+    def on_show(self, force=False):
+        # Se dall'ultimo render non è stato scritto nulla sul DB,
+        # la schermata è già aggiornata: evita di ricostruirla.
+        version = get_data_version()
+        if not force and version == self._rendered_version:
+            return
         self._reload_course_filter()
-        self._refresh_stats()
-        self._refresh_table()
+        rows_all = get_students_summary()
+        self._refresh_stats(rows_all)
+        self._refresh_table(rows_all)
+        self._rendered_version = version
 
     def _reload_course_filter(self):
         courses = get_all_courses()
@@ -69,11 +78,10 @@ class DashboardFrame(ctk.CTkFrame):
         if current not in self._course_filter_map:
             self._filter_var.set("Tutti i corsi")
 
-    def _refresh_stats(self):
+    def _refresh_stats(self, rows):
         for w in self.stats_frame.winfo_children():
             w.destroy()
 
-        rows = get_students_summary()
         total_students = len(rows)
         completed = sum(1 for r in rows if r["total_hours"] > 0 and r["hours_done"] >= r["total_hours"])
         near = sum(1 for r in rows if r["total_hours"] > 0 and 80 <= (r["hours_done"] / r["total_hours"] * 100) < 100)
@@ -90,13 +98,14 @@ class DashboardFrame(ctk.CTkFrame):
             ctk.CTkLabel(card, text=title, font=font(11),
                          text_color=GREY_TEXT).pack()
 
-    def _refresh_table(self):
+    def _refresh_table(self, rows=None):
         for w in self.table_frame.winfo_children():
             w.destroy()
 
         selected_label = self._filter_var.get()
         course_id = self._course_filter_map.get(selected_label)
-        rows = get_students_summary(course_id=course_id)
+        if rows is None or course_id is not None:
+            rows = get_students_summary(course_id=course_id)
 
         completed_names = [r["name"] for r in rows
                            if r["total_hours"] > 0 and r["hours_done"] >= r["total_hours"]]
@@ -110,7 +119,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         # Header — colonna Azioni aggiunta
         cols   = ["Nome allievo", "Corso", "Ore fatte", "Ore totali", "Progresso", "Azioni"]
-        widths = [180, 160, 80, 80, 260, 200]
+        widths = [180, 160, 80, 80, 260, 260]
         hdr = ctk.CTkFrame(self.table_frame, fg_color=HEAD_COLOR, corner_radius=6)
         hdr.pack(fill="x", pady=(0, 2))
         for col, w in zip(cols, widths):
@@ -136,7 +145,7 @@ class DashboardFrame(ctk.CTkFrame):
 
             course_disp = "Senza corso" if r["course_name"] == SYSTEM_COURSE else r["course_name"]
             ctk.CTkLabel(row_frame, text=r["name"], width=180, anchor="w",
-                         font=font(12)).pack(side="left", padx=8, pady=3)
+                         font=font(12)).pack(side="left", padx=8, pady=2)
             ctk.CTkLabel(row_frame, text=course_disp, width=160, anchor="w",
                          font=font(11), text_color=GREY_TEXT).pack(side="left", padx=8)
             ctk.CTkLabel(row_frame, text=f"{done:.1f} h", width=80, anchor="center",
@@ -144,24 +153,24 @@ class DashboardFrame(ctk.CTkFrame):
             ctk.CTkLabel(row_frame, text=f"{total:.1f} h", width=80, anchor="center",
                          font=font(11), text_color=GREY_TEXT).pack(side="left", padx=8)
 
-            # Barra progresso
-            prog = ctk.CTkFrame(row_frame, fg_color="transparent", width=260)
+            # Barra progresso — height esplicita: senza, con pack_propagate(False)
+            # il frame userebbe l'altezza default (enorme) e gonfierebbe la riga
+            prog = ctk.CTkFrame(row_frame, fg_color="transparent", width=260, height=22)
             prog.pack(side="left", padx=8)
             prog.pack_propagate(False)
-            bar = ctk.CTkProgressBar(prog, width=180, height=14,
+            bar = ctk.CTkProgressBar(prog, width=180, height=12,
                                      progress_color=bar_color, fg_color="#dfe6e9")
             bar.set(pct / 100)
-            bar.pack(side="left", pady=3)
+            bar.pack(side="left", pady=4)
             ctk.CTkLabel(prog, text=f"{pct:.0f}%", width=44,
                          font=font(11, "bold"),
                          text_color=bar_color).pack(side="left", padx=4)
 
-            # Colonna Azioni: pulsanti solo per allievi al 100%
-            actions = ctk.CTkFrame(row_frame, fg_color="transparent", width=200)
-            actions.pack(side="left", padx=8)
-            actions.pack_propagate(False)
-
+            # Colonna Azioni: creata solo per gli allievi al 100%
             if completed:
+                actions = ctk.CTkFrame(row_frame, fg_color="transparent", width=260, height=26)
+                actions.pack(side="left", padx=8)
+                actions.pack_propagate(False)
                 sid = r["id"]
                 sname = r["name"]
                 scourse = r["course_name"]
@@ -169,20 +178,20 @@ class DashboardFrame(ctk.CTkFrame):
                 sdone = done
                 stotal = total
                 ctk.CTkButton(
-                    actions, text="📜 Attestato", width=96, height=28,
+                    actions, text="📜 Attestato", width=96, height=24,
                     fg_color="#8e44ad", hover_color="#6c3483",
                     font=font(11),
                     command=lambda sid=sid, sname=sname, scourse=scourse, senroll=senroll, sdone=sdone, stotal=stotal:
                         self._generate_certificate(sname, scourse, senroll, sdone, stotal)
                 ).pack(side="left", padx=(0, 4))
                 ctk.CTkButton(
-                    actions, text="Nuovo corso", width=88, height=28,
+                    actions, text="Nuovo corso", width=88, height=24,
                     fg_color="#2980b9", hover_color="#1a6fa5",
                     font=font(11),
                     command=lambda sid=sid, sname=sname: self._open_change_course(sid, sname)
                 ).pack(side="left", padx=(0, 4))
                 ctk.CTkButton(
-                    actions, text="Elimina", width=66, height=28,
+                    actions, text="Elimina", width=66, height=24,
                     fg_color="#e74c3c", hover_color="#c0392b",
                     font=font(11),
                     command=lambda sid=sid, sname=sname: self._confirm_delete(sid, sname)

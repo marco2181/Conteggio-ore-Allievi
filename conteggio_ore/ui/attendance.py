@@ -103,6 +103,7 @@ class AttendanceFrame(ctk.CTkFrame):
         day_idx = self._selected_date.weekday()  # 0=Mon..5=Sat
         sessions = get_sessions_for_day(day_idx)
         students = get_all_students(active_only=True)
+        self._student_names = {s["id"]: s["name"] for s in students}
         query = self._search_var.get().strip().lower()
         if query:
             students = [s for s in students if query in s["name"].lower()]
@@ -205,7 +206,8 @@ class AttendanceFrame(ctk.CTkFrame):
                     notes = data["notes"].get().strip()
                     saves.append((stu_id, sess_id, date_str, hours, notes))
                 except ValueError:
-                    errors.append(f"Ore non valide per allievo id={stu_id}")
+                    name = self._student_names.get(stu_id, f"id={stu_id}")
+                    errors.append(f"Ore non valide per «{name}»: presenza non salvata.")
             else:
                 deletes.append((stu_id, sess_id, date_str))
 

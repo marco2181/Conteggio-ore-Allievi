@@ -1,6 +1,5 @@
 import sys
 import os
-import shutil
 import logging
 import logging.handlers
 from datetime import date
@@ -8,7 +7,7 @@ from datetime import date
 # Aggiunge la directory del progetto al path per gli import relativi
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from database.db import init_db, DB_PATH
+from database.db import init_db, DB_PATH, BACKUP_DIR, backup_database
 from ui.app import App
 
 _DATA_DIR = os.path.dirname(DB_PATH)
@@ -38,27 +37,27 @@ def _backup_db():
                 return
     except Exception:
         return
-    # Salva in Documenti: sopravvive a qualsiasi reinstallazione/aggiornamento
-    backup_dir = os.path.join(os.path.expanduser("~"), "Documents",
-                              "ConteggioOreAllievi", "backups")
-    os.makedirs(backup_dir, exist_ok=True)
+    # Salva in Documenti: sopravvive a qualsiasi reinstallazione/aggiornamento.
+    # backup_database usa l'API di SQLite: include anche il journal WAL
+    # (una semplice copia del file .db perderebbe le ultime scritture).
     today = date.today().strftime("%Y%m%d")
-    dest = os.path.join(backup_dir, f"auto_{today}.db")
+    dest = os.path.join(BACKUP_DIR, f"auto_{today}.db")
     if not os.path.exists(dest):
         try:
-            shutil.copy2(DB_PATH, dest)
+            backup_database(f"auto_{today}.db")
             logging.info(f"Backup automatico creato: {dest}")
         except Exception as e:
             logging.warning(f"Backup automatico fallito: {e}")
             return
-    # Mantieni solo gli ultimi 7 backup automatici
+    # Mantieni solo gli ultimi 7 backup giornalieri
+    # (ultimo_salvataggio.db non rientra nella rotazione)
     try:
         backups = sorted(
-            [f for f in os.listdir(backup_dir) if f.startswith("auto_") and f.endswith(".db")],
+            [f for f in os.listdir(BACKUP_DIR) if f.startswith("auto_") and f.endswith(".db")],
             reverse=True,
         )
         for old in backups[7:]:
-            os.remove(os.path.join(backup_dir, old))
+            os.remove(os.path.join(BACKUP_DIR, old))
             logging.info(f"Backup vecchio rimosso: {old}")
     except Exception:
         pass

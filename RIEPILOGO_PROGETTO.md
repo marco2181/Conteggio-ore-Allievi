@@ -267,7 +267,21 @@ conteggio_ore/data/conteggio_ore.db                      ← avvio con Python
 dist/ConteggioOreAllievi/data/conteggio_ore.db           ← versione portatile
 dist/data/conteggio_ore.db                               ← exe singolo
 ```
-Per fare un backup basta copiare il file `.db`. Per ripristinare, copiarlo nella stessa posizione.
+
+### Backup automatici (nessuna azione richiesta)
+
+Tutti i backup automatici vanno in `Documenti\ConteggioOreAllievi\backups\` (sopravvivono a reinstallazioni e aggiornamenti):
+
+| File | Quando viene creato |
+|---|---|
+| `ultimo_salvataggio.db` | **Ad ogni salvataggio** (presenze, allievi, corsi, turni) — sempre aggiornato all'ultimo stato |
+| `auto_AAAAMMGG.db` | Uno al giorno all'avvio dell'app (rotazione: ultimi 7 giorni) |
+
+Tutti i backup usano l'API di backup di SQLite: includono anche le transazioni nel journal WAL, quindi sono sempre coerenti anche se creati mentre l'app è in uso.
+
+### Backup / ripristino manuale
+
+Da **Impostazioni → 📦 Esporta backup / 📥 Importa backup**. In caso di crash o database danneggiato, importare `ultimo_salvataggio.db` dalla cartella dei backup automatici.
 
 ---
 
@@ -327,6 +341,12 @@ pyinstaller>=6.0.0
 | 09/06/2026 | Corso di sistema `__LIBERO__` auto-creato in `init_db()`, invisibile all'utente |
 | 09/06/2026 | Protezione: corso sistema non cancellabile, PDF e dashboard mostrano "Senza corso" |
 | 09/06/2026 | Suite di test automatici `test_portable.py` (14 test, 0 fallimenti) |
+| 02/07/2026 | Dashboard: righe compatte (i riquadri Progresso/Azioni non forzano più l'altezza; pulsanti solo per allievi al 100%) |
+| 02/07/2026 | Backup automatico ad ogni salvataggio: `ultimo_salvataggio.db` in Documenti, WAL-safe (API backup SQLite) |
+| 02/07/2026 | Fix backup/ripristino: i backup includono il journal WAL; il ripristino svuota i file `-wal`/`-shm` residui |
+| 02/07/2026 | Perf: versione dati globale — le schermate si ricostruiscono solo se il DB è cambiato dall'ultimo render |
+| 02/07/2026 | Presenze: messaggio errore ore non valide mostra il nome allievo (non più l'id interno) |
+| 02/07/2026 | Test suite estesa a 17 test (backup automatico + ripristino) — installer v1.2 |
 
 ---
 

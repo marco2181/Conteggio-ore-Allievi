@@ -15,6 +15,7 @@ from database.models import (
 )
 
 SENZA_CORSO_LABEL = "— Senza corso (ore individuali) —"
+from database.db import get_data_version
 from logic.sessions import day_name, slot_label, progress_color
 from ui.style import font
 
@@ -38,6 +39,7 @@ class StudentsFrame(ctk.CTkFrame):
         self.app = app
         self._show_archived = False
         self._search_job = None   # id dell'after in attesa (debounce ricerca)
+        self._rendered_version = None
         self._build()
 
     def _build(self):
@@ -77,7 +79,9 @@ class StudentsFrame(ctk.CTkFrame):
         self.scroll.pack(fill="both", expand=True, padx=24, pady=(10, 16))
 
     def on_show(self):
-        self._refresh_table()
+        # Ricostruisce la tabella solo se il DB è cambiato dall'ultimo render
+        if get_data_version() != self._rendered_version:
+            self._refresh_table()
 
     def _on_search_changed(self):
         # Debounce: senza, ogni tasto digitato ricostruiva l'intera tabella.
@@ -94,6 +98,7 @@ class StudentsFrame(ctk.CTkFrame):
 
     def _refresh_table(self):
         self._search_job = None
+        self._rendered_version = get_data_version()
         for w in self.scroll.winfo_children():
             w.destroy()
 

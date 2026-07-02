@@ -9,7 +9,7 @@
 ; Alla disinstallazione la cartella data\ con il database NON viene toccata.
 
 #define AppName "Conteggio Ore Allievi"
-#define AppVersion "1.1"
+#define AppVersion "1.2"
 #define AppPublisher "Studio Formazione"
 #define AppExeName "ConteggioOreAllievi.exe"
 

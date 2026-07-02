@@ -3,6 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from database.models import get_all_courses, add_course, update_course, delete_course, archive_course, restore_course
+from database.db import get_data_version
 
 MAIN_BG    = "#f5f6fa"
 CARD_BG    = "#ffffff"
@@ -25,6 +26,7 @@ class CoursesFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=MAIN_BG, corner_radius=0)
         self.app = app
         self._show_archived = False
+        self._rendered_version = None
         self._build()
 
     def _build(self):
@@ -46,7 +48,9 @@ class CoursesFrame(ctk.CTkFrame):
         self.scroll.pack(fill="both", expand=True, padx=24, pady=(14, 16))
 
     def on_show(self):
-        self._refresh()
+        # Ricostruisce la tabella solo se il DB è cambiato dall'ultimo render
+        if get_data_version() != self._rendered_version:
+            self._refresh()
 
     def _toggle_archived(self):
         self._show_archived = not self._show_archived
@@ -56,6 +60,7 @@ class CoursesFrame(ctk.CTkFrame):
         self._refresh()
 
     def _refresh(self):
+        self._rendered_version = get_data_version()
         for w in self.scroll.winfo_children():
             w.destroy()
 
