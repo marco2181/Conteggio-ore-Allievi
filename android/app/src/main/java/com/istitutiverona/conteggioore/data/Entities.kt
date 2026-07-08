@@ -1,6 +1,7 @@
 package com.istitutiverona.conteggioore.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 // Modello Fase 1: Persona ← Percorso → Corso, + Turni abituali.
@@ -53,4 +54,19 @@ data class Turno(
 data class TurnoAbituale(
     val personaId: Long,
     val turnoId: Long,
+)
+
+// Una presenza: percorso presente a un turno in una data, con le ore fatte.
+// Unico per (percorso, turno, data): ri-salvare aggiorna le ore (upsert).
+@Entity(
+    tableName = "presenze",
+    indices = [Index(value = ["percorsoId", "turnoId", "data"], unique = true)]
+)
+data class Presenza(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val percorsoId: Long,
+    val turnoId: Long,
+    val data: String,          // ISO yyyy-MM-dd
+    val ore: Double,
+    val note: String? = null,
 )

@@ -19,6 +19,19 @@ data class PersonaConPercorso(
     val nomeCorso: String?,
 )
 
+// Riga per il registro presenze: persona + suo percorso attivo + ore già fatte + presenza del turno/data (se c'è).
+data class RigaPresenza(
+    val personaId: Long,
+    val nome: String,
+    val etichetta: String?,
+    val percorsoId: Long,
+    val oreMonte: Double,
+    val oreFatte: Double,
+    val presenzaId: Long?,   // null = non ancora segnato oggi in questo turno
+    val oreSegnate: Double?,
+    val atteso: Boolean,     // true se ha questo turno tra gli abituali
+)
+
 @Dao
 interface CorsoDao {
     @Query("SELECT * FROM corsi ORDER BY attivo DESC, nome")
@@ -87,6 +100,11 @@ interface PersonaDao {
     @Query("UPDATE percorsi SET stato = 'ARCHIVIATO' WHERE personaId = :personaId AND stato = 'ATTIVO'")
     suspend fun archiviaPercorsoAttivo(personaId: Long)
 
+    @Query("SELECT id FROM percorsi WHERE personaId = :personaId AND stato = 'ATTIVO' LIMIT 1")
+    suspend fun percorsoAttivoId(personaId: Long): Long?
+
+    @Insert suspend fun aggiungiTurnoAbituale(t: TurnoAbituale)
+
     // Crea persona + primo percorso + turni abituali in una transazione.
     @Transaction
     suspend fun creaPersonaCompleta(persona: Persona, percorso: Percorso, turniIds: List<Long>): Long {
@@ -102,5 +120,46 @@ interface PersonaDao {
     suspend fun nuovoCorso(personaId: Long, nuovo: Percorso) {
         archiviaPercorsoAttivo(personaId)
         inserisciPercorso(nuovo.copy(personaId = personaId, stato = PERCORSO_ATTIVO))
+    }
+}
+
+@Dao
+interface PresenzaDao {
+    // Tutte le persone attive col percorso attivo: ore fatte + eventuale presenza per (turno,data).
+    // atteso = la persona ha quel turno tra gli abituali.
+    @Query(
+        """
+        SELECT p.id AS personaId, p.nome AS nome, p.etichetta AS etichetta,
+               pe.id AS percorsoId, pe.oreMonte AS oreMonte,
+               COALESCE((SELECT SUM(pr2.ore) FROM presenze pr2 WHERE pr2.percorsoId = pe.id), 0) AS oreFatte,
+               pr.id AS presenzaId, pr.ore AS oreSegnate,
+               (SELECT COUNT(*) FROM turni_abituali ta WHERE ta.personaId = p.id AND ta.turnoId = :turnoId) > 0 AS atteso
+        FROM persone p
+        JOIN percorsi pe ON pe.personaId = p.id AND pe.stato = 'ATTIVO'
+        LEFT JOIN presenze pr ON pr.percorsoId = pe.id AND pr.turnoId = :turnoId AND pr.data = :data
+        WHERE p.attiva = 1
+        ORDER BY atteso DESC, p.nome
+        """
+    )
+    fun righe(turnoId: Long, data: String): Flow<List<RigaPresenza>>
+
+    @Query("SELECT * FROM presenze WHERE percorsoId = :percorsoId AND turnoId = :turnoId AND data = :data LIMIT 1")
+    suspend fun trova(percorsoId: Long, turnoId: Long, data: String): Presenza?
+
+    @Insert suspend fun inserisci(p: Presenza)
+    @Update suspend fun aggiorna(p: Presenza)
+    @Delete suspend fun elimina(p: Presenza)
+
+    // Upsert: segna/aggiorna la presenza. Se ore <= 0, cancella.
+    @Transaction
+    suspend fun segna(percorsoId: Long, turnoId: Long, data: String, ore: Double, note: String?) {
+        val esistente = trova(percorsoId, turnoId, data)
+        when {
+            ore <= 0.0 && esistente != null -> elimina(esistente)
+            esistente == null && ore > 0.0 ->
+                inserisci(Presenza(percorsoId = percorsoId, turnoId = turnoId, data = data, ore = ore, note = note))
+            esistente != null && ore > 0.0 ->
+                aggiorna(esistente.copy(ore = ore, note = note ?: esistente.note))
+        }
     }
 }

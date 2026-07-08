@@ -6,14 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Corso::class, Persona::class, Percorso::class, Turno::class, TurnoAbituale::class],
-    version = 2,
+    entities = [Corso::class, Persona::class, Percorso::class, Turno::class, TurnoAbituale::class, Presenza::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun corsoDao(): CorsoDao
     abstract fun personaDao(): PersonaDao
     abstract fun turnoDao(): TurnoDao
+    abstract fun presenzaDao(): PresenzaDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

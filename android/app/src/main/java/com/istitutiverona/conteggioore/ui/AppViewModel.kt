@@ -8,9 +8,15 @@ import com.istitutiverona.conteggioore.data.Corso
 import com.istitutiverona.conteggioore.data.Percorso
 import com.istitutiverona.conteggioore.data.Persona
 import com.istitutiverona.conteggioore.data.Turno
+import com.istitutiverona.conteggioore.data.TurnoAbituale
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
@@ -72,6 +78,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** "Nuovo corso": archivia il percorso attivo, ne apre uno nuovo. */
     fun nuovoCorso(personaId: Long, percorso: Percorso) = viewModelScope.launch {
         db.personaDao().nuovoCorso(personaId, percorso)
+    }
+
+    // ── Presenze ───────────────────────────────────────────
+    // Data e turno selezionati nel registro presenze.
+    val dataSel = MutableStateFlow(LocalDate.now().toString())
+    val turnoSelId = MutableStateFlow<Long?>(null)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val righePresenza = combine(turnoSelId, dataSel) { tId, data -> tId to data }
+        .flatMapLatest { (tId, data) ->
+            if (tId == null) kotlinx.coroutines.flow.flowOf(emptyList())
+            else db.presenzaDao().righe(tId, data)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun segnaPresenza(percorsoId: Long, turnoId: Long, data: String, ore: Double, note: String? = null) =
+        viewModelScope.launch { db.presenzaDao().segna(percorsoId, turnoId, data, ore, note) }
+
+    fun rendiAbituale(personaId: Long, turnoId: Long) = viewModelScope.launch {
+        db.personaDao().aggiungiTurnoAbituale(TurnoAbituale(personaId, turnoId))
     }
 
     // ── Turni ──────────────────────────────────────────────
