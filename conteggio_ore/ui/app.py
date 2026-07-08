@@ -29,6 +29,9 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Conteggio Ore Allievi")
+        # Nell'exe senza console gli errori nei callback Tk sarebbero
+        # invisibili: l'utente crederebbe riuscita un'operazione fallita.
+        self.report_callback_exception = self._on_callback_error
         self.geometry("1100x680")
         self.minsize(900, 600)
         self.configure(fg_color=MAIN_BG)
@@ -93,6 +96,15 @@ class App(ctk.CTk):
         frame.tkraise()
         if hasattr(frame, "on_show"):
             frame.on_show()
+
+    def _on_callback_error(self, exc_type, exc, tb):
+        import logging
+        from tkinter import messagebox
+        logging.error("Errore non gestito", exc_info=(exc_type, exc, tb))
+        messagebox.showerror("Errore imprevisto",
+                             f"Si è verificato un errore:\n{exc}\n\n"
+                             "L'operazione potrebbe non essere stata completata.\n"
+                             "Dettagli nel file data\\app.log")
 
     def refresh_frame(self, name):
         # Se il frame non è ancora stato creato non serve aggiornarlo:

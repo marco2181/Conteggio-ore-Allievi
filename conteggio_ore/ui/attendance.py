@@ -10,6 +10,7 @@ from database.models import (
     save_attendance_batch,
     get_students_summary
 )
+from database.db import get_data_version
 from logic.sessions import day_name, slot_label
 from ui.style import font
 
@@ -26,6 +27,7 @@ class AttendanceFrame(ctk.CTkFrame):
         self._selected_date = date.today()
         self._entries = {}   # (student_id, session_id) -> {"check": BooleanVar, "hours": StringVar}
         self._search_job = None   # id dell'after in attesa (debounce ricerca)
+        self._rendered_key = None  # (versione dati, data, ricerca) dell'ultimo render
         self._build()
 
     def _build(self):
@@ -80,7 +82,14 @@ class AttendanceFrame(ctk.CTkFrame):
                       command=self._save).pack(side="right")
 
     def on_show(self):
-        self._load_day()
+        # Ricostruisce solo se DB, data o ricerca sono cambiati dall'ultimo render
+        try:
+            picked = self.date_picker.get_date()
+        except Exception:
+            picked = self._selected_date
+        key = (get_data_version(), picked, self._search_var.get())
+        if key != self._rendered_key:
+            self._load_day()
 
     def _on_search_changed(self):
         # Debounce: annulla la ricarica in attesa, riparte il timer.
@@ -91,6 +100,7 @@ class AttendanceFrame(ctk.CTkFrame):
 
     def _load_day(self):
         self._search_job = None
+        self._rendered_key = None  # impostata a fine render riuscito
         try:
             self._selected_date = self.date_picker.get_date()
         except Exception:
@@ -118,6 +128,7 @@ class AttendanceFrame(ctk.CTkFrame):
 
         for sess in sessions:
             self._build_session_block(sess, students, date_str)
+        self._rendered_key = (get_data_version(), self._selected_date, self._search_var.get())
 
     def _build_session_block(self, sess, students, date_str):
         sid = sess["id"]
@@ -220,7 +231,8 @@ class AttendanceFrame(ctk.CTkFrame):
         else:
             messagebox.showinfo("Salvato", f"Presenze salvate: {saved} registrazione/i.")
 
-        self.app.refresh_frame("Dashboard")
+        # La Dashboard si aggiornerà da sola alla prossima apertura:
+        # il suo on_show confronta la versione dati.
         self._check_threshold(snapshot_before)
 
     def _check_threshold(self, snapshot_before):

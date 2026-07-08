@@ -7,7 +7,7 @@ from datetime import date
 # Aggiunge la directory del progetto al path per gli import relativi
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from database.db import init_db, DB_PATH, BACKUP_DIR, backup_database
+from database.db import init_db, DB_PATH, BACKUP_DIR, backup_database, close_connection, flush_backup
 from ui.app import App
 
 _DATA_DIR = os.path.dirname(DB_PATH)
@@ -69,7 +69,14 @@ def main():
     _backup_db()
     init_db()
     app = App()
-    app.mainloop()
+    try:
+        app.mainloop()
+    finally:
+        # Backup rimandato dal throttle + chiusura connessione condivisa:
+        # SQLite fa il checkpoint del WAL, così il file .db resta
+        # autosufficiente (copiabile a mano)
+        flush_backup()
+        close_connection()
     logging.info("Chiusura applicazione")
 
 

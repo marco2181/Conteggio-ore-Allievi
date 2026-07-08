@@ -20,6 +20,8 @@ BACKUP_DIR = os.path.join(os.path.expanduser("~"), "Documents",
 # Le schermate lo confrontano con l'ultima versione renderizzata per
 # evitare di ricostruire tabelle identiche ad ogni cambio di pagina.
 _data_version = 0
+_last_backup_time = 0.0
+_backup_pending = False
 
 
 def get_data_version():
@@ -28,12 +30,32 @@ def get_data_version():
 
 def mark_db_written():
     """Da chiamare dopo ogni scrittura: aggiorna versione e backup automatico."""
-    global _data_version
+    global _data_version, _last_backup_time, _backup_pending
     _data_version += 1
+    # Throttle: durante operazioni in raffica (es. import CSV) un backup
+    # completo per ogni riga rallentava tutto. Al massimo uno ogni 2 s;
+    # le scritture rimaste fuori sono coperte da flush_backup() alla chiusura.
+    import time
+    if time.monotonic() - _last_backup_time < 2.0:
+        _backup_pending = True
+        return
     try:
         backup_database("ultimo_salvataggio.db")
+        _last_backup_time = time.monotonic()
+        _backup_pending = False
     except Exception:
         pass  # il backup non deve mai bloccare un salvataggio
+
+
+def flush_backup():
+    """Esegue il backup rimandato dal throttle (chiamata alla chiusura)."""
+    global _backup_pending
+    if _backup_pending:
+        try:
+            backup_database("ultimo_salvataggio.db")
+            _backup_pending = False
+        except Exception:
+            pass
 
 
 def backup_database(filename):
@@ -47,29 +69,21 @@ def backup_database(filename):
         return None
     os.makedirs(BACKUP_DIR, exist_ok=True)
     dest = os.path.join(BACKUP_DIR, filename)
-    src = sqlite3.connect(DB_PATH)
+    dst = sqlite3.connect(dest)
     try:
-        dst = sqlite3.connect(dest)
-        try:
-            src.backup(dst)
-        finally:
-            dst.close()
+        get_connection().backup(dst)
     finally:
-        src.close()
+        dst.close()
     return dest
 
 
 def export_database(dest_path):
     """Esporta il DB in un percorso scelto dall'utente (WAL-safe)."""
-    src = sqlite3.connect(DB_PATH)
+    dst = sqlite3.connect(dest_path)
     try:
-        dst = sqlite3.connect(dest_path)
-        try:
-            src.backup(dst)
-        finally:
-            dst.close()
+        get_connection().backup(dst)
     finally:
-        src.close()
+        dst.close()
 
 
 def restore_database(src_path):
@@ -79,17 +93,12 @@ def restore_database(src_path):
     se restassero, SQLite li riapplicherebbe sopra il DB ripristinato
     sovrascrivendo i dati del backup.
     """
-    import gc
     import shutil
-    # Su Windows eventuali connessioni residue (in attesa di garbage
-    # collection) tengono un handle sul file -wal e bloccano la rimozione
-    gc.collect()
+    # Chiude la connessione condivisa: su Windows terrebbe un handle
+    # sul file -wal bloccando la rimozione
     if os.path.exists(DB_PATH):
-        conn = sqlite3.connect(DB_PATH)
-        try:
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        finally:
-            conn.close()
+        get_connection().execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    close_connection()
     for suffix in ("-wal", "-shm"):
         leftover = DB_PATH + suffix
         try:
@@ -113,15 +122,29 @@ SESSIONS_DEFAULT = [
     (5, "pomeriggio", 3.0),   # Sabato pomeriggio
 ]
 
+# Connessione condivisa: l'app è single-thread (Tkinter), quindi una sola
+# connessione aperta una volta basta. Prima ne veniva creata una per query
+# senza mai chiuderla (leak di handle su Windows) e con il costo di
+# open + 3 PRAGMA a ogni accesso: i refresh delle schermate erano più lenti.
+_conn = None
+
 def get_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    # WAL: commit molto più veloci (importante su USB/dischi lenti)
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA synchronous = NORMAL")
-    return conn
+    global _conn
+    if _conn is None:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        _conn = sqlite3.connect(DB_PATH)
+        _conn.row_factory = sqlite3.Row
+        _conn.execute("PRAGMA foreign_keys = ON")
+        # WAL: commit molto più veloci (importante su USB/dischi lenti)
+        _conn.execute("PRAGMA journal_mode = WAL")
+        _conn.execute("PRAGMA synchronous = NORMAL")
+    return _conn
+
+def close_connection():
+    global _conn
+    if _conn is not None:
+        _conn.close()
+        _conn = None
 
 def init_db():
     conn = get_connection()
@@ -192,4 +215,3 @@ def init_db():
         cur.execute("INSERT INTO courses (name, total_hours) VALUES ('__LIBERO__', 0)")
 
     conn.commit()
-    conn.close()

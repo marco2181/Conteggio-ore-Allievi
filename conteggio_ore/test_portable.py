@@ -227,6 +227,7 @@ try:
     backup_file = os.path.join(dbmod.BACKUP_DIR, 'ultimo_salvataggio.db')
     if os.path.exists(backup_file):
         os.remove(backup_file)
+    dbmod._last_backup_time = 0.0  # azzera il throttle (max 1 backup ogni 2s)
     anna = next(s for s in m.get_all_students(active_only=True) if 'Anna' in s['name'])
     m.save_attendance_batch([(anna['id'], sess['id'], '2026-06-08', 3.0, '')], [])
     assert os.path.exists(backup_file), 'backup non creato dopo il salvataggio'
