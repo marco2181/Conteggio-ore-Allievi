@@ -9,6 +9,20 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+data class NomeEtichetta(val nome: String, val etichetta: String?)
+
+// Riga dashboard: persona + percorso attivo + ore fatte + n. turni abituali.
+data class RigaDashboard(
+    val personaId: Long,
+    val nome: String,
+    val etichetta: String?,
+    val nomeCorso: String?,
+    val corsoId: Long?,
+    val oreMonte: Double,
+    val oreFatte: Double,
+    val nTurni: Int,
+)
+
 // Persona + il suo percorso attivo (se c'è) + nome corso, per le liste.
 data class PersonaConPercorso(
     @Embedded val persona: Persona,
@@ -82,6 +96,22 @@ interface PersonaDao {
     @Query("SELECT COUNT(*) FROM persone WHERE nome = :nome AND id != :escludiId")
     suspend fun contaOmonimi(nome: String, escludiId: Long): Int
 
+    @Query(
+        """
+        SELECT p.id AS personaId, p.nome AS nome, p.etichetta AS etichetta,
+               c.nome AS nomeCorso, pe.corsoId AS corsoId,
+               pe.oreMonte AS oreMonte,
+               COALESCE((SELECT SUM(pr.ore) FROM presenze pr WHERE pr.percorsoId = pe.id), 0) AS oreFatte,
+               (SELECT COUNT(*) FROM turni_abituali ta WHERE ta.personaId = p.id) AS nTurni
+        FROM persone p
+        JOIN percorsi pe ON pe.personaId = p.id AND pe.stato = 'ATTIVO'
+        LEFT JOIN corsi c ON c.id = pe.corsoId
+        WHERE p.attiva = 1
+        ORDER BY p.nome
+        """
+    )
+    fun dashboard(): Flow<List<RigaDashboard>>
+
     @Query("SELECT * FROM percorsi WHERE personaId = :personaId ORDER BY dataInizio DESC")
     fun percorsiDi(personaId: Long): Flow<List<Percorso>>
 
@@ -145,6 +175,25 @@ interface PresenzaDao {
 
     @Query("SELECT * FROM presenze WHERE percorsoId = :percorsoId AND turnoId = :turnoId AND data = :data LIMIT 1")
     suspend fun trova(percorsoId: Long, turnoId: Long, data: String): Presenza?
+
+    // Assenti in una settimana [lunedi..sabato]: persone attive col percorso attivo
+    // che NON hanno presenze in quella settimana e non hanno ancora completato il monte ore
+    // entro fine settimana; escluse quelle iscritte dopo sabato.
+    @Query(
+        """
+        SELECT p.nome AS nome, p.etichetta AS etichetta
+        FROM persone p
+        JOIN percorsi pe ON pe.personaId = p.id AND pe.stato = 'ATTIVO'
+        WHERE p.attiva = 1
+          AND pe.dataInizio <= :sabato
+          AND (SELECT COUNT(*) FROM presenze pr
+               WHERE pr.percorsoId = pe.id AND pr.data BETWEEN :lunedi AND :sabato) = 0
+          AND COALESCE((SELECT SUM(pr2.ore) FROM presenze pr2
+               WHERE pr2.percorsoId = pe.id AND pr2.data <= :sabato), 0) < pe.oreMonte
+        ORDER BY p.nome
+        """
+    )
+    suspend fun assentiSettimana(lunedi: String, sabato: String): List<NomeEtichetta>
 
     @Insert suspend fun inserisci(p: Presenza)
     @Update suspend fun aggiorna(p: Presenza)

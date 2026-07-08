@@ -37,6 +37,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val turni = db.turnoDao().tutti()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val dashboard = db.personaDao().dashboard()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Assenti della settimana scorsa (lun-sab). Ricalcolati on-demand.
+    val assentiSettScorsa = MutableStateFlow<List<com.istitutiverona.conteggioore.data.NomeEtichetta>>(emptyList())
+    init {
+        viewModelScope.launch {
+            val oggi = LocalDate.now()
+            val lunScorso = oggi.minusWeeks(1)
+                .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+            val sabScorso = lunScorso.plusDays(5)
+            assentiSettScorsa.value =
+                db.presenzaDao().assentiSettimana(lunScorso.toString(), sabScorso.toString())
+        }
+    }
 
     // ── Corsi ──────────────────────────────────────────────
     fun salvaCorso(c: Corso) = viewModelScope.launch {
