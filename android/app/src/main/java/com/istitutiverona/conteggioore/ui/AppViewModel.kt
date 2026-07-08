@@ -3,9 +3,11 @@ package com.istitutiverona.conteggioore.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.istitutiverona.conteggioore.data.Allievo
 import com.istitutiverona.conteggioore.data.AppDatabase
 import com.istitutiverona.conteggioore.data.Corso
+import com.istitutiverona.conteggioore.data.Percorso
+import com.istitutiverona.conteggioore.data.Persona
+import com.istitutiverona.conteggioore.data.Turno
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -13,27 +15,73 @@ import kotlinx.coroutines.launch
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
 
+    init {
+        // Seed turni al primo avvio se vuoti.
+        viewModelScope.launch {
+            if (db.turnoDao().conteggio() == 0)
+                db.turnoDao().inserisciTutti(AppDatabase.TURNI_DEFAULT)
+        }
+    }
+
     val corsi = db.corsoDao().tutti()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val corsiAttivi = db.corsoDao().attivi()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val allievi = db.allievoDao().attivi()
+    val persone = db.personaDao().attiveConPercorso()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val turni = db.turnoDao().tutti()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // ── Corsi ──────────────────────────────────────────────
     fun salvaCorso(c: Corso) = viewModelScope.launch {
         if (c.id == 0L) db.corsoDao().inserisci(c) else db.corsoDao().aggiorna(c)
     }
     fun archiviaCorso(c: Corso) = viewModelScope.launch {
         db.corsoDao().aggiorna(c.copy(attivo = !c.attivo))
     }
-
-    fun salvaAllievo(a: Allievo) = viewModelScope.launch {
-        if (a.id == 0L) db.allievoDao().inserisci(a) else db.allievoDao().aggiorna(a)
+    /** Elimina un corso solo se nessun percorso lo usa. Ritorna true se eliminato. */
+    suspend fun eliminaCorsoSePossibile(c: Corso): Boolean {
+        if (db.corsoDao().percorsiConCorso(c.id) > 0) return false
+        db.corsoDao().elimina(c)
+        return true
     }
-    suspend fun omonimi(nome: String, escludiId: Long) =
-        db.allievoDao().contaOmonimi(nome, escludiId)
 
-    fun nomeCorso(id: Long?): String =
+    // ── Persone / percorsi ─────────────────────────────────
+    suspend fun omonimi(nome: String, escludiId: Long) =
+        db.personaDao().contaOmonimi(nome, escludiId)
+
+    suspend fun turniAbitualiDi(personaId: Long) =
+        db.personaDao().turniAbitualiDi(personaId)
+
+    /** Crea persona + primo percorso + turni abituali. */
+    fun creaPersona(persona: Persona, percorso: Percorso, turniIds: List<Long>) =
+        viewModelScope.launch {
+            db.personaDao().creaPersonaCompleta(persona, percorso, turniIds)
+        }
+
+    /** Aggiorna anagrafica persona (nome/etichetta) + turni abituali. */
+    fun aggiornaPersona(persona: Persona, turniIds: List<Long>) = viewModelScope.launch {
+        db.personaDao().aggiornaPersona(persona)
+        db.personaDao().cancellaTurniAbituali(persona.id)
+        if (turniIds.isNotEmpty())
+            db.personaDao().inserisciTurniAbituali(
+                turniIds.map { com.istitutiverona.conteggioore.data.TurnoAbituale(persona.id, it) }
+            )
+    }
+
+    /** "Nuovo corso": archivia il percorso attivo, ne apre uno nuovo. */
+    fun nuovoCorso(personaId: Long, percorso: Percorso) = viewModelScope.launch {
+        db.personaDao().nuovoCorso(personaId, percorso)
+    }
+
+    // ── Turni ──────────────────────────────────────────────
+    fun salvaTurno(t: Turno) = viewModelScope.launch {
+        if (t.id == 0L) db.turnoDao().inserisci(t) else db.turnoDao().aggiorna(t)
+    }
+    fun eliminaTurno(t: Turno) = viewModelScope.launch { db.turnoDao().elimina(t) }
+
+    // ── Helper ─────────────────────────────────────────────
+    fun nomeCorsoDaId(id: Long?): String =
         if (id == null) "Ore individuali"
         else corsi.value.firstOrNull { it.id == id }?.nome ?: "—"
 }

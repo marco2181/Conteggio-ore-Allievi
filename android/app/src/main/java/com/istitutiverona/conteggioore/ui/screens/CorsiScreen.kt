@@ -7,12 +7,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.istitutiverona.conteggioore.data.Corso
 import com.istitutiverona.conteggioore.ui.AppViewModel
+import kotlinx.coroutines.launch
 
 private val PRESET = listOf(20.0, 90.0, 150.0, 300.0)
 
@@ -21,6 +21,8 @@ private val PRESET = listOf(20.0, 90.0, 150.0, 300.0)
 fun CorsiScreen(vm: AppViewModel) {
     val corsi by vm.corsi.collectAsState()
     var editing by remember { mutableStateOf<Corso?>(null) }
+    var errore by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         floatingActionButton = {
@@ -40,6 +42,12 @@ fun CorsiScreen(vm: AppViewModel) {
                             TextButton(onClick = { vm.archiviaCorso(c) }) {
                                 Text(if (c.attivo) "Archivia" else "Ripristina")
                             }
+                            if (!c.attivo) TextButton(onClick = {
+                                scope.launch {
+                                    if (!vm.eliminaCorsoSePossibile(c))
+                                        errore = "Impossibile eliminare: il corso è usato da un percorso."
+                                }
+                            }) { Text("Elimina") }
                         }
                     }
                 )
@@ -53,6 +61,13 @@ fun CorsiScreen(vm: AppViewModel) {
             corso = corso,
             onDismiss = { editing = null },
             onSave = { vm.salvaCorso(it); editing = null }
+        )
+    }
+    errore?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { errore = null },
+            confirmButton = { TextButton(onClick = { errore = null }) { Text("OK") } },
+            text = { Text(msg) }
         )
     }
 }

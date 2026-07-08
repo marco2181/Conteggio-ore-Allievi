@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.istitutiverona.conteggioore.ui.AppViewModel
 import com.istitutiverona.conteggioore.ui.screens.AllieviScreen
-import com.istitutiverona.conteggioore.ui.screens.CorsiScreen
+import com.istitutiverona.conteggioore.ui.screens.AltroScreen
 import com.istitutiverona.conteggioore.ui.screens.PlaceholderScreen
 import com.istitutiverona.conteggioore.ui.theme.ConteggioOreTheme
 
@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
                             Tab.Presenze -> PlaceholderScreen("Presenze")
                             Tab.Allievi -> AllieviScreen(vm)
                             Tab.Report -> PlaceholderScreen("Report")
-                            Tab.Altro -> CorsiScreen(vm)   // Corsi vive in "Altro"
+                            Tab.Altro -> AltroScreen(vm)
                         }
                     }
                 }
