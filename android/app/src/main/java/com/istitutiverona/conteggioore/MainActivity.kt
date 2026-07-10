@@ -20,8 +20,8 @@ import com.istitutiverona.conteggioore.ui.AppViewModel
 import com.istitutiverona.conteggioore.ui.screens.AllieviScreen
 import com.istitutiverona.conteggioore.ui.screens.AltroScreen
 import com.istitutiverona.conteggioore.ui.screens.DashboardScreen
-import com.istitutiverona.conteggioore.ui.screens.PlaceholderScreen
 import com.istitutiverona.conteggioore.ui.screens.PresenzeScreen
+import com.istitutiverona.conteggioore.ui.screens.ReportScreen
 import com.istitutiverona.conteggioore.ui.theme.ConteggioOreTheme
 
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
                             Tab.Dashboard -> DashboardScreen(vm)
                             Tab.Presenze -> PresenzeScreen(vm)
                             Tab.Allievi -> AllieviScreen(vm)
-                            Tab.Report -> PlaceholderScreen("Report")
+                            Tab.Report -> ReportScreen(vm)
                             Tab.Altro -> AltroScreen(vm)
                         }
                     }

@@ -11,6 +11,35 @@ import kotlinx.coroutines.flow.Flow
 
 data class NomeEtichetta(val nome: String, val etichetta: String?)
 
+// ── Righe per i report PDF ─────────────────────────────
+data class RigaPresenzaReport(
+    val data: String,
+    val giorno: Int,
+    val fascia: String,
+    val ore: Double,
+    val note: String?,
+)
+
+data class RigaMensile(
+    val nome: String,
+    val etichetta: String?,
+    val nomeCorso: String?,
+    val corsoId: Long?,
+    val giaAvviato: Boolean,
+    val oreMese: Double,
+    val oreTotali: Double,
+    val oreMonte: Double,
+)
+
+data class RigaReportCorso(
+    val nome: String,
+    val etichetta: String?,
+    val dataInizio: String,
+    val giaAvviato: Boolean,
+    val oreFatte: Double,
+    val oreMonte: Double,
+)
+
 // Riga dashboard: persona + percorso attivo + ore fatte + n. turni abituali.
 data class RigaDashboard(
     val personaId: Long,
@@ -198,6 +227,50 @@ interface PresenzaDao {
     @Insert suspend fun inserisci(p: Presenza)
     @Update suspend fun aggiorna(p: Presenza)
     @Delete suspend fun elimina(p: Presenza)
+
+    // ── Query report PDF ───────────────────────────────
+    @Query(
+        """
+        SELECT pr.data AS data, t.giorno AS giorno, t.fascia AS fascia, pr.ore AS ore, pr.note AS note
+        FROM presenze pr JOIN turni t ON t.id = pr.turnoId
+        WHERE pr.percorsoId = :percorsoId
+        ORDER BY pr.data, t.giorno, t.id
+        """
+    )
+    suspend fun presenzeReport(percorsoId: Long): List<RigaPresenzaReport>
+
+    @Query(
+        """
+        SELECT p.nome AS nome, p.etichetta AS etichetta, c.nome AS nomeCorso,
+               pe.corsoId AS corsoId, pe.giaAvviato AS giaAvviato,
+               COALESCE((SELECT SUM(ore) FROM presenze WHERE percorsoId = pe.id AND data BETWEEN :da AND :a), 0) AS oreMese,
+               COALESCE((SELECT SUM(ore) FROM presenze WHERE percorsoId = pe.id), 0) AS oreTotali,
+               pe.oreMonte AS oreMonte
+        FROM persone p
+        JOIN percorsi pe ON pe.personaId = p.id AND pe.stato = 'ATTIVO'
+        LEFT JOIN corsi c ON c.id = pe.corsoId
+        WHERE p.attiva = 1
+        ORDER BY p.nome
+        """
+    )
+    suspend fun righeMensili(da: String, a: String): List<RigaMensile>
+
+    @Query(
+        """
+        SELECT p.nome AS nome, p.etichetta AS etichetta, pe.dataInizio AS dataInizio,
+               pe.giaAvviato AS giaAvviato,
+               COALESCE((SELECT SUM(ore) FROM presenze WHERE percorsoId = pe.id), 0) AS oreFatte,
+               pe.oreMonte AS oreMonte
+        FROM persone p
+        JOIN percorsi pe ON pe.personaId = p.id AND pe.stato = 'ATTIVO' AND pe.corsoId = :corsoId
+        WHERE p.attiva = 1
+        ORDER BY p.nome
+        """
+    )
+    suspend fun righeCorso(corsoId: Long): List<RigaReportCorso>
+
+    @Query("SELECT * FROM percorsi WHERE id = :id")
+    suspend fun percorso(id: Long): Percorso?
 
     // Upsert: segna/aggiorna la presenza. Se ore <= 0, cancella.
     @Transaction

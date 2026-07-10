@@ -115,6 +115,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         db.personaDao().aggiungiTurnoAbituale(TurnoAbituale(personaId, turnoId))
     }
 
+    // ── Report PDF ─────────────────────────────────
+    suspend fun pdfSchedaIndividuale(riga: com.istitutiverona.conteggioore.data.PersonaConPercorso): java.io.File {
+        val ctx = getApplication<Application>()
+        val percorsoId = riga.percorsoId!!
+        val percorso = db.presenzaDao().percorso(percorsoId)
+        val presenze = db.presenzaDao().presenzeReport(percorsoId).map {
+            com.istitutiverona.conteggioore.pdf.PresenzaPdf(it.data, it.giorno, it.fascia, it.ore, it.note)
+        }
+        return com.istitutiverona.conteggioore.pdf.PdfReport.schedaIndividuale(
+            ctx,
+            riga.persona.nome + (riga.persona.etichetta?.let { " ($it)" } ?: ""),
+            if (riga.corsoId == null) "Ore individuali" else riga.nomeCorso ?: "—",
+            riga.oreMonte ?: 0.0,
+            riga.giaAvviato == true,
+            percorso?.note,
+            presenze,
+        )
+    }
+
+    suspend fun pdfRegistroMensile(anno: Int, mese: Int): java.io.File {
+        val ctx = getApplication<Application>()
+        val da = LocalDate.of(anno, mese, 1)
+        val a = da.plusMonths(1).minusDays(1)
+        val righe = db.presenzaDao().righeMensili(da.toString(), a.toString()).map {
+            com.istitutiverona.conteggioore.pdf.RigaMensilePdf(
+                it.nome + (it.etichetta?.let { e -> " ($e)" } ?: ""),
+                if (it.corsoId == null) "Ore individuali" else it.nomeCorso ?: "—",
+                it.giaAvviato, it.oreMese, it.oreTotali, it.oreMonte,
+            )
+        }
+        val label = "%02d/%d".format(mese, anno)
+        return com.istitutiverona.conteggioore.pdf.PdfReport.registroMensile(ctx, label, righe)
+    }
+
+    suspend fun pdfReportCorso(corso: Corso): java.io.File {
+        val ctx = getApplication<Application>()
+        val righe = db.presenzaDao().righeCorso(corso.id).map {
+            com.istitutiverona.conteggioore.pdf.RigaCorsoPdf(
+                it.nome + (it.etichetta?.let { e -> " ($e)" } ?: ""),
+                it.dataInizio, it.giaAvviato, it.oreFatte, it.oreMonte,
+            )
+        }
+        return com.istitutiverona.conteggioore.pdf.PdfReport.reportCorso(ctx, corso.nome, righe)
+    }
+
     // ── Turni ──────────────────────────────────────────────
     fun salvaTurno(t: Turno) = viewModelScope.launch {
         if (t.id == 0L) db.turnoDao().inserisci(t) else db.turnoDao().aggiorna(t)
