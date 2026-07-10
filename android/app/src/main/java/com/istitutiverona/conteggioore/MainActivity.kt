@@ -33,12 +33,20 @@ enum class Tab(val label: String, val icon: ImageVector) {
 }
 
 class MainActivity : ComponentActivity() {
+
+    override fun onStop() {
+        super.onStop()
+        // Tenta il backup subito quando l'app va in background, senza bloccare.
+        com.istitutiverona.conteggioore.drive.Backup.tentaOra(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             ConteggioOreTheme {
                 val vm: AppViewModel = viewModel()
                 var tab by remember { mutableStateOf(Tab.Dashboard) }
+                com.istitutiverona.conteggioore.ui.screens.WizardIniziale()
 
                 Scaffold(
                     bottomBar = {

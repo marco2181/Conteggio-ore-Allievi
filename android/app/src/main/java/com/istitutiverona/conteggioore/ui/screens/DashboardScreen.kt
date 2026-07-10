@@ -48,6 +48,17 @@ fun DashboardScreen(vm: AppViewModel) {
         }
 
         // Avvisi
+        item {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            if (com.istitutiverona.conteggioore.drive.Backup.problema(ctx)) {
+                Avviso(
+                    "Backup Drive non riuscito",
+                    "Dettagli in Altro → Backup. Ultimo riuscito: " +
+                        (com.istitutiverona.conteggioore.drive.Backup.ultimoOk(ctx) ?: "mai"),
+                    Color(0xFFFDECEA), Color(0xFFC0392B)
+                )
+            }
+        }
         if (assenti.isNotEmpty()) {
             item {
                 Avviso(

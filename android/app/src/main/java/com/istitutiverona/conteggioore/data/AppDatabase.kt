@@ -32,6 +32,12 @@ abstract class AppDatabase : RoomDatabase() {
             Turno(giorno = 5, fascia = "pomeriggio", oreDefault = 3.0),
         )
 
+        /** Chiude Room per sostituire il file DB (import). L'app va riavviata dopo. */
+        fun chiudi() {
+            INSTANCE?.close()
+            INSTANCE = null
+        }
+
         fun get(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(

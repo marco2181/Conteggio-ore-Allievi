@@ -21,6 +21,9 @@ import java.time.LocalDate
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val db = AppDatabase.get(app)
 
+    /** Snapshot locale + upload Drive debounced 2 min. Da chiamare dopo ogni modifica. */
+    private fun backup() = com.istitutiverona.conteggioore.drive.Backup.pianifica(getApplication())
+
     init {
         // Seed turni al primo avvio se vuoti.
         viewModelScope.launch {
@@ -48,22 +51,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val lunScorso = oggi.minusWeeks(1)
                 .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
             val sabScorso = lunScorso.plusDays(5)
-            assentiSettScorsa.value =
-                db.presenzaDao().assentiSettimana(lunScorso.toString(), sabScorso.toString())
+            // Assenze non retroattive: prima della data di inizio configurata non si calcolano.
+            val inizio = getApplication<Application>()
+                .getSharedPreferences("backup", android.content.Context.MODE_PRIVATE)
+                .getString("inizio_assenze", null)
+            if (inizio == null || inizio <= lunScorso.toString())
+                assentiSettScorsa.value =
+                    db.presenzaDao().assentiSettimana(lunScorso.toString(), sabScorso.toString())
         }
     }
 
     // ── Corsi ──────────────────────────────────────────────
     fun salvaCorso(c: Corso) = viewModelScope.launch {
         if (c.id == 0L) db.corsoDao().inserisci(c) else db.corsoDao().aggiorna(c)
+        backup()
     }
     fun archiviaCorso(c: Corso) = viewModelScope.launch {
         db.corsoDao().aggiorna(c.copy(attivo = !c.attivo))
+        backup()
     }
     /** Elimina un corso solo se nessun percorso lo usa. Ritorna true se eliminato. */
     suspend fun eliminaCorsoSePossibile(c: Corso): Boolean {
         if (db.corsoDao().percorsiConCorso(c.id) > 0) return false
         db.corsoDao().elimina(c)
+        backup()
         return true
     }
 
@@ -78,6 +89,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun creaPersona(persona: Persona, percorso: Percorso, turniIds: List<Long>) =
         viewModelScope.launch {
             db.personaDao().creaPersonaCompleta(persona, percorso, turniIds)
+            backup()
         }
 
     /** Aggiorna anagrafica persona (nome/etichetta) + turni abituali. */
@@ -88,11 +100,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             db.personaDao().inserisciTurniAbituali(
                 turniIds.map { com.istitutiverona.conteggioore.data.TurnoAbituale(persona.id, it) }
             )
+        backup()
     }
 
     /** "Nuovo corso": archivia il percorso attivo, ne apre uno nuovo. */
     fun nuovoCorso(personaId: Long, percorso: Percorso) = viewModelScope.launch {
         db.personaDao().nuovoCorso(personaId, percorso)
+        backup()
     }
 
     // ── Presenze ───────────────────────────────────────────
@@ -109,7 +123,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun segnaPresenza(percorsoId: Long, turnoId: Long, data: String, ore: Double, note: String? = null) =
-        viewModelScope.launch { db.presenzaDao().segna(percorsoId, turnoId, data, ore, note) }
+        viewModelScope.launch {
+            db.presenzaDao().segna(percorsoId, turnoId, data, ore, note)
+            backup()
+        }
 
     fun rendiAbituale(personaId: Long, turnoId: Long) = viewModelScope.launch {
         db.personaDao().aggiungiTurnoAbituale(TurnoAbituale(personaId, turnoId))
@@ -163,8 +180,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ── Turni ──────────────────────────────────────────────
     fun salvaTurno(t: Turno) = viewModelScope.launch {
         if (t.id == 0L) db.turnoDao().inserisci(t) else db.turnoDao().aggiorna(t)
+        backup()
     }
-    fun eliminaTurno(t: Turno) = viewModelScope.launch { db.turnoDao().elimina(t) }
+    fun eliminaTurno(t: Turno) = viewModelScope.launch { db.turnoDao().elimina(t); backup() }
 
     // ── Helper ─────────────────────────────────────────────
     fun nomeCorsoDaId(id: Long?): String =
