@@ -169,6 +169,7 @@ private fun SchedaPersona(vm: AppViewModel, pp: PersonaConPercorso, onDismiss: (
     val turniSel = remember { mutableStateListOf<Long>() }
     var caricato by remember { mutableStateOf(false) }
     var nuovoCorso by remember { mutableStateOf(false) }
+    var confermaElimina by remember { mutableStateOf(false) }
 
     LaunchedEffect(pp.persona.id) {
         turniSel.clear(); turniSel.addAll(vm.turniAbitualiDi(pp.persona.id)); caricato = true
@@ -209,9 +210,28 @@ private fun SchedaPersona(vm: AppViewModel, pp: PersonaConPercorso, onDismiss: (
                 }
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = { nuovoCorso = true }) { Text("Nuovo corso") }
+                TextButton(onClick = { confermaElimina = true }) {
+                    Text("Elimina allievo", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     )
+
+    if (confermaElimina) {
+        AlertDialog(
+            onDismissRequest = { confermaElimina = false },
+            title = { Text("Eliminare ${pp.persona.nome}?") },
+            text = { Text("Verranno eliminati definitivamente anche percorsi e presenze. L'operazione non si può annullare.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.eliminaPersona(pp.persona.id)
+                    confermaElimina = false
+                    onDismiss()
+                }) { Text("Elimina definitivamente", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confermaElimina = false }) { Text("Annulla") } }
+        )
+    }
 
     if (nuovoCorso) {
         NuovoCorsoDialog(corsi, onDismiss = { nuovoCorso = false }) { corsoId, oreInd ->

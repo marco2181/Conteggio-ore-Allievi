@@ -33,8 +33,9 @@ fun WizardIniziale() {
     val login = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
-        if (res.resultCode == Activity.RESULT_OK)
-            connesso = GoogleSignIn.getLastSignedInAccount(ctx) != null
+        connesso = runCatching {
+            GoogleSignIn.getSignedInAccountFromIntent(res.data).getResult()
+        }.isSuccess
     }
 
     AlertDialog(

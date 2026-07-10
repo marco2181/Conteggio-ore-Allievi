@@ -49,8 +49,10 @@ fun BackupScreen() {
     val loginLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
-        if (res.resultCode == Activity.RESULT_OK)
-            account = GoogleSignIn.getLastSignedInAccount(ctx)
+        // Parsare esplicitamente il risultato salva l'account per GoogleAuthUtil.
+        runCatching { GoogleSignIn.getSignedInAccountFromIntent(res.data).getResult() }
+            .onSuccess { account = it }
+            .onFailure { toast("Login Google non riuscito: ${it.message ?: "errore sconosciuto"}") }
     }
 
     val exportLauncher = rememberLauncherForActivityResult(

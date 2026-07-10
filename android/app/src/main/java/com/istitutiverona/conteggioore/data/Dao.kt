@@ -180,6 +180,22 @@ interface PersonaDao {
         archiviaPercorsoAttivo(personaId)
         inserisciPercorso(nuovo.copy(personaId = personaId, stato = PERCORSO_ATTIVO))
     }
+
+    @Query("DELETE FROM presenze WHERE percorsoId IN (SELECT id FROM percorsi WHERE personaId = :personaId)")
+    suspend fun cancellaPresenzeDi(personaId: Long)
+    @Query("DELETE FROM percorsi WHERE personaId = :personaId")
+    suspend fun cancellaPercorsiDi(personaId: Long)
+    @Query("DELETE FROM persone WHERE id = :personaId")
+    suspend fun cancellaPersona(personaId: Long)
+
+    // Elimina definitivamente persona + percorsi + presenze + turni abituali.
+    @Transaction
+    suspend fun eliminaPersonaCompleta(personaId: Long) {
+        cancellaPresenzeDi(personaId)
+        cancellaPercorsiDi(personaId)
+        cancellaTurniAbituali(personaId)
+        cancellaPersona(personaId)
+    }
 }
 
 @Dao

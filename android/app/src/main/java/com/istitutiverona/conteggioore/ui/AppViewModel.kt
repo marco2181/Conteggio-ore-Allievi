@@ -109,6 +109,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         backup()
     }
 
+    /** Elimina definitivamente allievo + percorsi + presenze. */
+    fun eliminaPersona(personaId: Long) = viewModelScope.launch {
+        db.personaDao().eliminaPersonaCompleta(personaId)
+        backup()
+    }
+
     // ── Presenze ───────────────────────────────────────────
     // Data e turno selezionati nel registro presenze.
     val dataSel = MutableStateFlow(LocalDate.now().toString())
