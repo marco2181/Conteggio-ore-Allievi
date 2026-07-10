@@ -30,6 +30,7 @@ import java.io.File
 import kotlin.system.exitProcess
 
 private fun opzioniGoogle() = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+    .requestEmail()
     .requestScopes(Scope(Drive.SCOPE)).build()
 
 // Impostazioni backup: Google Drive, ripristino, import/export locale.

@@ -48,6 +48,7 @@ fun WizardIniziale() {
                 if (connesso) Text("✓ Account connesso", fontSize = 13.sp)
                 else OutlinedButton(onClick = {
                     val opts = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestEmail()
                         .requestScopes(Scope(Drive.SCOPE)).build()
                     login.launch(GoogleSignIn.getClient(ctx, opts).signInIntent)
                 }) { Text("Connetti Google") }

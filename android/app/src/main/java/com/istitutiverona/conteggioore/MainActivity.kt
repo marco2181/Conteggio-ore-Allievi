@@ -3,7 +3,10 @@ package com.istitutiverona.conteggioore
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.fragment.app.FragmentActivity
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -14,7 +17,11 @@ import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.istitutiverona.conteggioore.ui.AppViewModel
 import com.istitutiverona.conteggioore.ui.screens.AllieviScreen
@@ -44,6 +51,7 @@ class MainActivity : FragmentActivity() {
         sbloccato.value = false   // ri-chiedi biometria alla prossima apertura
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -61,14 +69,37 @@ class MainActivity : FragmentActivity() {
                 com.istitutiverona.conteggioore.ui.screens.WizardIniziale()
 
                 Scaffold(
+                    topBar = {
+                        CenterAlignedTopAppBar(
+                            title = {
+                                Image(
+                                    painter = painterResource(R.drawable.logo_istituti_verona),
+                                    contentDescription = "Istituti Verona Moda & Design",
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.width(180.dp).height(48.dp),
+                                )
+                            },
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = Color.Black,
+                                titleContentColor = Color.White,
+                            ),
+                        )
+                    },
                     bottomBar = {
-                        NavigationBar {
+                        NavigationBar(containerColor = Color.Black) {
                             Tab.entries.forEach { t ->
                                 NavigationBarItem(
                                     selected = tab == t,
                                     onClick = { tab = t },
                                     icon = { Icon(t.icon, contentDescription = t.label) },
-                                    label = { Text(t.label) }
+                                    label = { Text(t.label) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = Color.White,
+                                        selectedTextColor = Color.White,
+                                        indicatorColor = Color(0xFFFF4534),
+                                        unselectedIconColor = Color(0xFFBDBDBD),
+                                        unselectedTextColor = Color(0xFFBDBDBD),
+                                    ),
                                 )
                             }
                         }
