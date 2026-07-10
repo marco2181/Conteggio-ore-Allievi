@@ -140,6 +140,30 @@ fun BackupScreen() {
         Text("L'import sostituisce tutti i dati attuali (viene fatto prima un backup locale).",
             fontSize = 12.sp)
 
+        HorizontalDivider()
+
+        // ── Sicurezza ──
+        Text("Sicurezza", fontWeight = FontWeight.Bold)
+        val blocco = com.istitutiverona.conteggioore.sicurezza.Blocco
+        var bloccoOn by remember { mutableStateOf(blocco.attivo(ctx)) }
+        val activity = ctx as androidx.fragment.app.FragmentActivity
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Switch(bloccoOn, { voluto ->
+                if (!blocco.disponibile(ctx)) {
+                    toast("Nessuna biometria o PIN configurati sul dispositivo")
+                } else if (voluto) {
+                    blocco.imposta(ctx, true); bloccoOn = true
+                } else {
+                    // Disattivabile solo dopo conferma biometrica/PIN.
+                    blocco.chiedi(activity, "Conferma per disattivare il blocco") { ok ->
+                        if (ok) { blocco.imposta(ctx, false); bloccoOn = false }
+                    }
+                }
+            })
+            Spacer(Modifier.width(8.dp))
+            Text("Richiedi biometria o PIN all'apertura")
+        }
+
         if (occupato) LinearProgressIndicator(Modifier.fillMaxWidth())
     }
 

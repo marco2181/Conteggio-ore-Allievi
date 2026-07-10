@@ -50,6 +50,14 @@ fun DashboardScreen(vm: AppViewModel) {
         // Avvisi
         item {
             val ctx = androidx.compose.ui.platform.LocalContext.current
+            // Login Google richiesto ma non bloccante: avviso persistente finché non accedi.
+            if (com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(ctx) == null) {
+                Avviso(
+                    "Account Google non connesso",
+                    "I dati non vengono salvati su Drive. Accedi da Altro → Backup.",
+                    Color(0xFFFEF5E7), Color(0xFFB9770E)
+                )
+            }
             if (com.istitutiverona.conteggioore.drive.Backup.problema(ctx)) {
                 Avviso(
                     "Backup Drive non riuscito",

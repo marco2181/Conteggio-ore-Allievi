@@ -1,8 +1,8 @@
 package com.istitutiverona.conteggioore
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -32,18 +32,30 @@ enum class Tab(val label: String, val icon: ImageVector) {
     Altro("Altro", Icons.Filled.MoreHoriz),
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    // Sbloccato per questa sessione? Torna false quando l'app va in background.
+    private val sbloccato = androidx.compose.runtime.mutableStateOf(false)
 
     override fun onStop() {
         super.onStop()
         // Tenta il backup subito quando l'app va in background, senza bloccare.
         com.istitutiverona.conteggioore.drive.Backup.tentaOra(this)
+        sbloccato.value = false   // ri-chiedi biometria alla prossima apertura
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             ConteggioOreTheme {
+                val blocco = com.istitutiverona.conteggioore.sicurezza.Blocco
+                if (blocco.attivo(this) && blocco.disponibile(this) && !sbloccato.value) {
+                    com.istitutiverona.conteggioore.ui.screens.SchermataBlocco(
+                        onSblocca = { sbloccato.value = true }
+                    )
+                    return@ConteggioOreTheme
+                }
+
                 val vm: AppViewModel = viewModel()
                 var tab by remember { mutableStateOf(Tab.Dashboard) }
                 com.istitutiverona.conteggioore.ui.screens.WizardIniziale()
